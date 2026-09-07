@@ -13,22 +13,6 @@ function notImplemented(name: string) {
 	};
 }
 
-export function registerUsage(program: Command): void {
-	program
-		.command("usage")
-		.description("Show plan consumption (quota used vs remaining)")
-		.action(notImplemented("usage"));
-}
-
-export function registerHistory(program: Command): void {
-	program
-		.command("history")
-		.description("Show the local read-only question log")
-		.option("--limit <n>", "Show the last N entries", (v) => Number.parseInt(v, 10), 50)
-		.option("--clear", "Clear the local history")
-		.action(notImplemented("history"));
-}
-
 export function registerUpdate(program: Command): void {
 	program
 		.command("update")

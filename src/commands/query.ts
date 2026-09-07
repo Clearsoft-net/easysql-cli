@@ -13,6 +13,7 @@ import {
 	upsertConnector,
 } from "../config/connectors-store.js";
 import { executeSelect } from "../db/execute.js";
+import { appendHistory } from "../history/store.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
 import { renderResult } from "../output/table.js";
@@ -95,6 +96,13 @@ export function registerQuery(program: Command): void {
 
 			if (opts.generateOnly) {
 				console.log(sql);
+				appendHistory({
+					at: new Date().toISOString(),
+					question,
+					connector: connector.name,
+					sql,
+					status: "generate-only",
+				});
 				return;
 			}
 
@@ -135,6 +143,16 @@ export function registerQuery(program: Command): void {
 				),
 			);
 			printSuccess(t().success.queryDone(result.row_count));
+
+			appendHistory({
+				at: new Date().toISOString(),
+				question,
+				connector: connector.name,
+				sql,
+				row_count: result.row_count,
+				duration_ms: result.duration_ms,
+				status: "ok",
+			});
 		});
 }
 

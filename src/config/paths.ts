@@ -10,9 +10,14 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 
 let overrideConfigPath: string | undefined;
+let overrideDataDir: string | undefined;
 
 export function setConfigPathOverride(path: string | undefined): void {
 	overrideConfigPath = path;
+}
+
+export function setDataDirOverride(path: string | undefined): void {
+	overrideDataDir = path;
 }
 
 function xdgHome(envVar: string, fallback: string): string {
@@ -49,6 +54,7 @@ export function getConfigPath(): string {
  * Returns the directory where local data (history, etc.) is stored.
  */
 export function getDataDir(): string {
+	if (overrideDataDir) return overrideDataDir;
 	const isWin = platform() === "win32";
 	if (isWin) {
 		const localAppData = process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local");

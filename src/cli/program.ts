@@ -3,11 +3,11 @@
  */
 
 import { Command } from "commander";
+import { registerConnector } from "../commands/connector.js";
 import { registerHelp } from "../commands/help.js";
 import { registerLogin } from "../commands/login.js";
 import { registerLogout } from "../commands/logout.js";
 import {
-	registerConnector,
 	registerHistory,
 	registerQuery,
 	registerUpdate,

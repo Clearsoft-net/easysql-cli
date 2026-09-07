@@ -1,6 +1,7 @@
 /**
- * Command stubs — wired in commits 3+. Kept as `throw new Error("not implemented")`
- * so the program tree is verifiable end-to-end before business logic lands.
+ * Command stubs for commands that are NOT yet wired in the current commit.
+ * Each is replaced with a real implementation in a subsequent commit so
+ * the program tree is verifiable end-to-end before business logic lands.
  */
 
 import type { Command } from "commander";
@@ -10,32 +11,6 @@ function notImplemented(name: string) {
 		console.error(`'${name}' is not implemented yet (arrives in a later commit).`);
 		process.exit(1);
 	};
-}
-
-export function registerConnector(program: Command): void {
-	const conn = program.command("connector").description("Manage local connectors");
-
-	conn.command("add")
-		.description("Add a local MySQL/Postgres connector")
-		.option("--name <name>", "Connector name")
-		.option("--type <type>", "mysql | mariadb | postgresql")
-		.option("--connection-url <url>", "Full connection URL")
-		.option("--host <host>", "Database host")
-		.option("--port <port>", "Database port", (v) => Number.parseInt(v, 10))
-		.option("--user <user>", "Database user")
-		.option("--password <pass>", "Database password (otherwise prompted)")
-		.option("--database <db>", "Database name")
-		.option("--ssl", "Require SSL/TLS")
-		.action(notImplemented("connector add"));
-
-	conn.command("sync")
-		.description("Re-extract and push schema metadata")
-		.option("--id <id>", "Sync a specific connector")
-		.action(notImplemented("connector sync"));
-
-	conn.command("list")
-		.description("List connectors known to EasySQL")
-		.action(notImplemented("connector list"));
 }
 
 export function registerQuery(program: Command): void {

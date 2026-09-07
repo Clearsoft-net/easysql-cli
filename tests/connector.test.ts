@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -84,7 +84,6 @@ describe("connector commands", () => {
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
-		// Use a connection URL to localhost:1 (guaranteed failure on any system)
 		const code = await run([
 			"--json",
 			"connector",
@@ -96,12 +95,10 @@ describe("connector commands", () => {
 			"--connection-url",
 			"mysql://root:root@127.0.0.1:1/db",
 		]);
-		// Connection should fail BEFORE we hit the API.
 		expect(code).toBe(1);
 	});
 
 	it("connector add returns 2 when not logged in", async () => {
-		// Overwrite config with empty credentials.
 		writeFileSync(
 			join(tmp, "config.json"),
 			JSON.stringify({ api_url: "", api_key: "", last_login_at: "" }),
@@ -113,9 +110,48 @@ describe("connector commands", () => {
 
 	it("rejects unknown --type", async () => {
 		handler = () => Promise.resolve(jsonResponse({}));
-		const code = await run(["connector", "add", "--name", "X", "--type", "sqlite"]);
+		const code = await run([
+			"connector",
+			"add",
+			"--non-interactive",
+			"--name",
+			"X",
+			"--type",
+			"mongodb",
+		]);
 		expect(code).toBe(1);
 	});
 
-	void spyOn; // keep import alive in case future tests need it
+	it("--non-interactive fails when required fields are missing", async () => {
+		handler = () => Promise.resolve(jsonResponse({}));
+		// Missing --type → should fail without prompting (CI mode).
+		const code = await run(["connector", "add", "--non-interactive", "--name", "X"]);
+		expect(code).toBe(1);
+	});
+
+	it("--non-interactive rejects without ever opening a prompt", async () => {
+		let fetched = false;
+		handler = (url) => {
+			fetched = true;
+			if (url.endsWith("/v1/connectors")) {
+				return Promise.resolve(jsonResponse({ id: "c1", name: "x" }, 201));
+			}
+			throw new Error(`unexpected: ${url}`);
+		};
+		// Provide everything but the password — non-interactive must fail before hitting the API.
+		const code = await run([
+			"--json",
+			"connector",
+			"add",
+			"--non-interactive",
+			"--name",
+			"Test",
+			"--type",
+			"mysql",
+			"--connection-url",
+			"mysql://root@127.0.0.1:1/db",
+		]);
+		expect(code).toBe(1);
+		expect(fetched).toBe(false);
+	});
 });

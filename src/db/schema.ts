@@ -22,9 +22,11 @@ export interface TableSchema {
 
 export type ConnectorSchema = TableSchema[];
 
+export type DatabaseType = "mysql" | "mariadb" | "postgresql" | "sqlite";
+
 export interface ConnectorSummary {
 	id: string;
-	type: "mysql" | "mariadb" | "postgresql" | "external";
+	type: DatabaseType | "external";
 	name: string;
 	created_at?: string;
 	updated_at?: string;

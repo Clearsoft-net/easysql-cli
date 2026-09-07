@@ -28,7 +28,15 @@ describe("parseConnectionUrl", () => {
 	});
 
 	it("rejects unsupported protocols", () => {
-		expect(() => parseConnectionUrl("sqlite:///tmp/db.sqlite")).toThrow(/Unsupported protocol/);
+		expect(() => parseConnectionUrl("mongodb://localhost/db")).toThrow(/Unsupported protocol/);
+	});
+
+	it("parses a sqlite:/// URL into the file path", () => {
+		const c = parseConnectionUrl("sqlite:///tmp/db.sqlite");
+		expect(c.type).toBe("sqlite");
+		expect(c.database).toBe("/tmp/db.sqlite");
+		expect(c.host).toBe("");
+		expect(c.port).toBe(0);
 	});
 
 	it("rejects missing user", () => {

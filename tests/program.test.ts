@@ -73,6 +73,7 @@ describe("CLI program", () => {
 			"help",
 			"login",
 			"logout",
+			"demo",
 			"connector",
 			"query",
 			"usage",

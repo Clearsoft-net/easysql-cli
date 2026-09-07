@@ -2,7 +2,8 @@
  * Persisted list of locally-registered connectors — what name maps to which
  * local DB. Stored at $XDG_CONFIG_HOME/easysql/connectors.json with 0600
  * permissions. Holds ONLY non-credential metadata: name, type, host, port,
- * database, user, ssl. The password is NEVER persisted.
+ * database, user, ssl. The password is NEVER persisted. SQLite connectors
+ * have no credentials — only the absolute file path lives in `database`.
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -12,7 +13,7 @@ import { getConfigDir } from "./paths.js";
 export interface StoredConnector {
 	id?: string;
 	name: string;
-	type: "mysql" | "mariadb" | "postgresql";
+	type: "mysql" | "mariadb" | "postgresql" | "sqlite";
 	host: string;
 	port: number;
 	user: string;

@@ -92,6 +92,19 @@ describe("login / logout commands", () => {
 		expect(cfg.api_key).toBe("");
 	});
 
+	it("--non-interactive fails when --api-key is missing", async () => {
+		delete process.env.EASYSQL_API_KEY;
+		handler = () => Promise.resolve(jsonResponse({}));
+		const code = await run([
+			"--api-url",
+			"https://api.example.com",
+			"login",
+			"--non-interactive",
+		]);
+		expect(code).toBe(4);
+		expect(loadConfig().api_key).toBe("");
+	});
+
 	it("logout removes the stored key", async () => {
 		handler = (url) => {
 			if (url.endsWith("/v1/auth/me")) {

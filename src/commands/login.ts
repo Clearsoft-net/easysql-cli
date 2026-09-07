@@ -5,6 +5,10 @@
  * interactively via promptSecret. The key is validated against the API by
  * calling /v1/auth/me. On success it is saved to the local config file
  * with 0600 permissions.
+ *
+ * By default the command is interactive: missing --api-key triggers a
+ * secure prompt. Pass --non-interactive (alias -y) to disable prompts and
+ * fail with a clear error when the key is missing.
  */
 
 import type { Command } from "commander";
@@ -18,12 +22,21 @@ import { promptSecret } from "../util/prompt.js";
 interface LoginOptions {
 	apiKey?: string;
 	apiUrl?: string;
+	nonInteractive?: boolean;
 }
 
 async function resolveApiKey(options: LoginOptions): Promise<string> {
 	if (options.apiKey && options.apiKey.length > 0) return options.apiKey;
 	const envKey = process.env.EASYSQL_API_KEY;
 	if (envKey && envKey.length > 0) return envKey;
+
+	if (options.nonInteractive) {
+		throw new ApiError(
+			0,
+			"No API key provided. Pass --api-key, set $EASYSQL_API_KEY, or omit --non-interactive to be prompted.",
+		);
+	}
+
 	const secret = await promptSecret(`${t().prompts.apiKeyPrompt}: `);
 	if (!secret) {
 		throw new ApiError(
@@ -40,6 +53,7 @@ export function registerLogin(program: Command): void {
 		.description("Authenticate with an EasySQL API key")
 		.option("--api-key <key>", "Provide the API key inline (otherwise prompted)")
 		.option("--api-url <url>", "Override the API base URL for this login")
+		.option("--non-interactive, -y", "Disable prompts; fail when required values are missing")
 		.action(async (options: LoginOptions, cmd: Command) => {
 			const apiKey = await resolveApiKey(options);
 			const parentOpts = (cmd.parent?.opts() ?? {}) as { apiUrl?: string };

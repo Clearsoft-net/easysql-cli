@@ -6,7 +6,7 @@
 
 # EasySQL CLI / TUI
 
-> Ask questions in natural language to your local **MySQL** or **PostgreSQL** database — straight from your terminal.
+> Ask questions in natural language to your local **MySQL**, **PostgreSQL** or **SQLite** database — straight from your terminal.
 
 [![npm version](https://img.shields.io/npm/v/@clearsoft/easysql-cli?color=F97316&style=flat-square)](https://www.npmjs.com/package/@clearsoft/easysql-cli)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
@@ -14,8 +14,8 @@
 
 The **EasySQL CLI** is the open-source counterpart to the WordPress plugin. It runs the full EasySQL query flow client-side:
 
-1. You connect a local MySQL or PostgreSQL database.
-2. The CLI introspects the schema and pushes **only the schema metadata** to the EasySQL API — credentials never leave your machine.
+1. You connect a local MySQL, PostgreSQL or SQLite database. (Or run `easysql demo` to spin up a sample SQLite base in seconds.)
+2. The CLI introspects the schema and pushes **only the schema metadata** to the EasySQL API — credentials never leave your machine. SQLite connectors have no credentials at all.
 3. You ask questions in natural language; the API returns SQL.
 4. The CLI validates that the SQL is **SELECT-only** and executes it against your local database.
 5. Results are printed as a table — or opened in an interactive TUI shell.
@@ -40,22 +40,29 @@ chmod +x easysql && ./easysql --help
 # 1. Authenticate (API key created in the dashboard)
 easysql login
 
-# 2. Add a local database connector (schema is sent to EasySQL, not credentials)
+# 2a. (Easiest) Generate a local sample SQLite database and use it immediately
+easysql demo
+easysql query "Top 3 customers by revenue"
+
+# 2b. Or add a real local database connector (schema is sent to EasySQL, not credentials)
 easysql connector add \
   --name "Local Postgres" \
   --type postgresql \
   --host localhost --port 5432 --database mydb --user me --password mypass
 
-# 3. Sync the schema to EasySQL
-easysql connector sync
+# 2c. Or point at a local SQLite file
+easysql connector add \
+  --name "Local SQLite" \
+  --type sqlite \
+  --file /path/to/your.db
 
-# 4. Ask a question
+# 3. Ask a question
 easysql query "How many orders did we get last week?"
 
-# 5. SQL-only mode (no local execution)
+# 4. SQL-only mode (no local execution)
 easysql query "Top 5 customers by revenue" --generate-only
 
-# 6. Open the interactive TUI shell
+# 5. Open the interactive TUI shell
 easysql
 ```
 
@@ -65,7 +72,8 @@ easysql
 |---|---|
 | `easysql login` | Authenticate with an EasySQL API key |
 | `easysql logout` | Clear local credentials |
-| `easysql connector add` | Add a local MySQL/Postgres connector |
+| `easysql demo` | Generate a local sample SQLite database and register it as `local-demo` |
+| `easysql connector add` | Add a local MySQL / Postgres / SQLite connector |
 | `easysql connector sync` | Re-extract and push schema metadata |
 | `easysql connector list` | List connectors from EasySQL |
 | `easysql query "<question>"` | Generate SQL and run it locally |
@@ -96,7 +104,7 @@ cd easysql-cli
 bun install
 make build          # tsc → dist/
 make build-compile  # bun build --compile → easysql (standalone binary)
-make test           # vitest
+make test           # bun test
 make check          # biome + tsc --noEmit
 ```
 

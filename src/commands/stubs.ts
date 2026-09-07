@@ -12,22 +12,6 @@ function notImplemented(name: string) {
 	};
 }
 
-export function registerLogin(program: Command): void {
-	program
-		.command("login")
-		.description("Authenticate with an EasySQL API key")
-		.option("--api-key <key>", "Provide the API key inline (otherwise prompted)")
-		.option("--api-url <url>", "Override the API base URL for this login")
-		.action(notImplemented("login"));
-}
-
-export function registerLogout(program: Command): void {
-	program
-		.command("logout")
-		.description("Clear stored credentials")
-		.action(notImplemented("logout"));
-}
-
 export function registerConnector(program: Command): void {
 	const conn = program.command("connector").description("Manage local connectors");
 

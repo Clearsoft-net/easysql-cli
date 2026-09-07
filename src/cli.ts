@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 /**
  * CLI entrypoint — runs the commander program with global error handling.
  *
@@ -16,14 +14,19 @@ import { CliError } from "./cli/errors.js";
 import { buildProgram } from "./cli/program.js";
 import { printError } from "./output/print.js";
 
-async function main() {
+/**
+ * Runs the CLI with the given argv. Returns the exit code instead of
+ * calling process.exit — used by the binary entrypoint and by tests.
+ */
+export async function run(argv: string[]): Promise<number> {
 	const program = buildProgram();
 	try {
-		await program.parseAsync(process.argv);
+		await program.parseAsync(argv, { from: "user" });
+		return 0;
 	} catch (err) {
 		if (err instanceof CliError) {
 			printError(err.message);
-			process.exit(err.exitCode);
+			return err.exitCode;
 		}
 		// Commander's exitOverride throws CommanderError for parse failures.
 		if (err && typeof err === "object" && "code" in err) {
@@ -34,16 +37,14 @@ async function main() {
 				code === "commander.help" ||
 				code === "commander.version"
 			) {
-				process.exit(0);
+				return 0;
 			}
 			if (code === "commander.unknownCommand" || code === "commander.unknownOption") {
-				process.exit(1);
+				return 1;
 			}
 		}
 		const message = err instanceof Error ? err.message : String(err);
 		printError(message);
-		process.exit(1);
+		return 1;
 	}
 }
-
-await main();

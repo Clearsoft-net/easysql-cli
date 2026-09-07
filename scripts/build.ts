@@ -37,11 +37,10 @@ if (shouldCompile) {
 		[
 			"build",
 			"--compile",
-			"--target=bun",
 			"--minify",
 			"--outfile",
 			join(binDir, "easysql"),
-			join(root, "src/cli.ts"),
+			join(root, "src/bin.ts"),
 		],
 		{ cwd: root },
 	);

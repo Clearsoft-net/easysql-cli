@@ -4,7 +4,7 @@
 	"description": "EasySQL CLI/TUI — run natural-language queries against your local MySQL or PostgreSQL database using the EasySQL API.",
 	"type": "module",
 	"bin": {
-		"easysql": "./dist/cli.js"
+		"easysql": "./dist/bin.js"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -20,8 +20,8 @@
 		"build": "bun run scripts/build.ts",
 		"build:compile": "bun run scripts/build.ts --compile",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run",
-		"test:watch": "vitest",
+		"test": "bun test",
+		"test:watch": "bun test --watch",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"format": "biome format --write .",
@@ -41,8 +41,7 @@
 		"@types/pg": "^8.11.10",
 		"@types/semver": "^7.5.8",
 		"semver": "^7.6.3",
-		"typescript": "^5.7.0",
-		"vitest": "^3.0.0"
+		"typescript": "^5.7.0"
 	},
 	"engines": {
 		"bun": ">=1.1.0",

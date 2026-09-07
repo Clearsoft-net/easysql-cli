@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { buildProgram } from "../src/cli/program.js";
 
 type Output = { stdout: string; stderr: string; exitCode: number };
 
 function captureProgramOutput(fn: () => void): Output {
-	const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-	const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-	const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-	const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+	const stdout = spyOn(process.stdout, "write").mockImplementation(() => true);
+	const stderr = spyOn(process.stderr, "write").mockImplementation(() => true);
+	const logSpy = spyOn(console, "log").mockImplementation(() => undefined);
+	const exit = spyOn(process, "exit").mockImplementation(((code?: number) => {
 		throw new Error(`__exit__:${code ?? 0}`);
 	}) as never);
 

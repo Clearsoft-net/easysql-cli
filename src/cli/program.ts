@@ -4,15 +4,16 @@
 
 import { Command } from "commander";
 import { registerHelp } from "../commands/help.js";
+import { registerLogin } from "../commands/login.js";
+import { registerLogout } from "../commands/logout.js";
 import {
 	registerConnector,
 	registerHistory,
-	registerLogin,
-	registerLogout,
 	registerQuery,
 	registerUpdate,
 	registerUsage,
 } from "../commands/stubs.js";
+import { setConfigPathOverride } from "../config/paths.js";
 import { HELP_COMMANDS, HELP_GLOBAL_OPTIONS, HELP_TOP } from "../i18n/help.js";
 import { setColorsEnabled, setJsonMode } from "../output/print.js";
 import { VERSION } from "../version.js";
@@ -36,10 +37,12 @@ export function buildProgram(): Command {
 		.exitOverride();
 
 	// Pre-action: apply global flags before any subcommand runs.
-	program.hook("preAction", (thisCommand) => {
-		const opts = thisCommand.opts<GlobalOptions>();
+	program.hook("preAction", (_thisCommand, actionCommand) => {
+		const opts = program.opts<GlobalOptions>();
 		if (opts.json) setJsonMode(true);
 		if (opts.color === false) setColorsEnabled(false);
+		if (opts.config) setConfigPathOverride(opts.config);
+		void actionCommand;
 	});
 
 	registerHelp(program);

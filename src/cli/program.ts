@@ -9,7 +9,7 @@ import { registerHistory } from "../commands/history.js";
 import { registerLogin } from "../commands/login.js";
 import { registerLogout } from "../commands/logout.js";
 import { registerQuery } from "../commands/query.js";
-import { registerUpdate } from "../commands/stubs.js";
+import { registerUpdate } from "../commands/update.js";
 import { registerUsage } from "../commands/usage.js";
 import { setConfigPathOverride } from "../config/paths.js";
 import { HELP_COMMANDS, HELP_GLOBAL_OPTIONS, HELP_TOP } from "../i18n/help.js";

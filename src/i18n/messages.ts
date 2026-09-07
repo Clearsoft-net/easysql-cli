@@ -37,6 +37,8 @@ export const MESSAGES = {
 			connectorSynced: (n: number) => `Synced schema for ${n} connector(s).`,
 			queryDone: (rows: number) => `Returned ${rows} row(s).`,
 			updated: (from: string, to: string) => `Updated ${from} → ${to}.`,
+			updateAlreadyLatest: (current: string, latest: string) =>
+				`Already on the latest version (current: ${current}, latest: ${latest}).`,
 		},
 		info: {
 			fetchingLatest: "Fetching latest release…",

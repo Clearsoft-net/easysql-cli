@@ -26,6 +26,7 @@ interface RawSdk {
 	syncConnector: SdkMethod<unknown>;
 	createQuery: SdkMethod<unknown>;
 	getQuery: SdkMethod<unknown>;
+	answerQuery: SdkMethod<unknown>;
 	listQueries: SdkMethod<unknown>;
 	dashboardStats: SdkMethod<unknown>;
 }
@@ -87,9 +88,10 @@ export interface AuthenticatedClient {
 	updateConnector: (body: unknown, id: string) => Promise<unknown>;
 	deleteConnector: (id: string) => Promise<unknown>;
 	getConnectorSchema: (id: string) => Promise<unknown>;
-	syncConnector: (id: string) => Promise<unknown>;
+	syncConnector: (body: unknown, id: string) => Promise<unknown>;
 	createQuery: (body: unknown) => Promise<unknown>;
 	getQuery: (id: string) => Promise<unknown>;
+	answerQuery: (body: unknown, id: string) => Promise<unknown>;
 	listQueries: (params: { page?: number; per_page?: number }) => Promise<unknown>;
 	dashboardStats: () => Promise<unknown>;
 }
@@ -108,9 +110,12 @@ export function getAuthenticatedClient(apiKey: string, apiUrl: string): Authenti
 		deleteConnector: (id) => call(() => sdk.deleteConnector({ connector_id: id } as never)),
 		getConnectorSchema: (id) =>
 			call(() => sdk.getConnectorSchema({ connector_id: id } as never)),
-		syncConnector: (id) => call(() => sdk.syncConnector({ connector_id: id } as never)),
+		syncConnector: (body, id) =>
+			call(() => sdk.syncConnector(body as never, { path: { connector_id: id } } as never)),
 		createQuery: (body) => call(() => sdk.createQuery(body as never)),
 		getQuery: (id) => call(() => sdk.getQuery({ query_id: id } as never)),
+		answerQuery: (body, id) =>
+			call(() => sdk.answerQuery(body as never, { path: { query_id: id } } as never)),
 		listQueries: (params) =>
 			call(() => sdk.listQueries({ page: params.page, per_page: params.per_page } as never)),
 		dashboardStats: () => call(() => sdk.dashboardStats()),

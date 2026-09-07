@@ -8,6 +8,7 @@ import {
 	HELP_CONNECTOR_ADD,
 	HELP_CONNECTOR_LIST,
 	HELP_CONNECTOR_SYNC,
+	HELP_DEMO,
 	HELP_GLOBAL_OPTIONS,
 	HELP_HELP,
 	HELP_HISTORY,
@@ -22,6 +23,7 @@ import {
 const HELP_BY_TOPIC: Record<string, string> = {
 	login: HELP_LOGIN,
 	logout: HELP_LOGOUT,
+	demo: HELP_DEMO,
 	"connector add": HELP_CONNECTOR_ADD,
 	"connector sync": HELP_CONNECTOR_SYNC,
 	"connector list": HELP_CONNECTOR_LIST,

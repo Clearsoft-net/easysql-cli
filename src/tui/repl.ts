@@ -62,8 +62,8 @@ async function runQuestion(question: string, connectorName: string): Promise<voi
 	const res = (await client.createQuery({
 		connector_id: stored.id,
 		question,
-	})) as { id?: string; sql?: string };
-	const sql = res.sql ?? "";
+	})) as { id?: string; sql?: string; sql_generated?: string | null };
+	const sql = res.sql_generated ?? res.sql ?? "";
 
 	printInfo("Generated SQL:");
 	console.log(sql);
@@ -74,7 +74,7 @@ async function runQuestion(question: string, connectorName: string): Promise<voi
 			host: stored.host,
 			port: stored.port,
 			user: stored.user,
-			password: await readPasswordInteractive(),
+			password: stored.type === "sqlite" ? "" : await readPasswordInteractive(),
 			database: stored.database,
 			ssl: stored.ssl,
 		},
@@ -103,7 +103,12 @@ export async function startRepl(opts: ReplOptions): Promise<number> {
 
 	const list = loadConnectors();
 	if (list.length === 0) {
-		printError("No local connectors. Run `easysql connector add` first.");
+		console.log("No local connectors yet.");
+		console.log("  • Run `easysql demo` to generate a sample SQLite database.");
+		console.log("  • Or run `easysql connector add --type sqlite --file <path.db>`.");
+		console.log(
+			"  • Or run `easysql connector add --type mysql|postgresql` to connect a server.",
+		);
 		return 1;
 	}
 

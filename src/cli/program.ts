@@ -4,6 +4,7 @@
 
 import { Command } from "commander";
 import { registerConnector } from "../commands/connector.js";
+import { registerDemo } from "../commands/demo.js";
 import { registerHelp } from "../commands/help.js";
 import { registerHistory } from "../commands/history.js";
 import { registerLogin } from "../commands/login.js";
@@ -53,6 +54,7 @@ export function buildProgram(): Command {
 	registerHelp(program);
 	registerLogin(program);
 	registerLogout(program);
+	registerDemo(program);
 	registerConnector(program);
 	registerQuery(program);
 	registerUsage(program);

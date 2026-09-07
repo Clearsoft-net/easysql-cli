@@ -1,9 +1,11 @@
 /**
- * Executes a (validated) SELECT statement against the local MySQL or
- * PostgreSQL database. Returns rows as plain objects so the table renderer
- * can format them uniformly. No streaming — LIMIT<=100 keeps payloads small.
+ * Executes a (validated) SELECT statement against the local MySQL,
+ * PostgreSQL or SQLite database. Returns rows as plain objects so the
+ * table renderer can format them uniformly. No streaming — LIMIT<=100
+ * keeps payloads small.
  */
 
+import { Database } from "bun:sqlite";
 import { createConnection } from "mysql2/promise";
 import pg from "pg";
 import { validateSelectOnly } from "../util/sql-validator.js";
@@ -16,11 +18,11 @@ export interface LocalQueryResult {
 }
 
 interface ConnSpec {
-	type: "mysql" | "mariadb" | "postgresql";
-	host: string;
-	port: number;
-	user: string;
-	password: string;
+	type: "mysql" | "mariadb" | "postgresql" | "sqlite";
+	host?: string;
+	port?: number;
+	user?: string;
+	password?: string;
 	database: string;
 	ssl?: boolean;
 }
@@ -38,12 +40,28 @@ export async function executeSelect(spec: ConnSpec, sql: string): Promise<LocalQ
 
 	const started = Date.now();
 	if (spec.type === "mysql" || spec.type === "mariadb") {
-		return runMysql(spec, sql, started);
+		return runMysql(spec as MysqlSpec, sql, started);
 	}
-	return runPostgres(spec, sql, started);
+	if (spec.type === "postgresql") {
+		return runPostgres(spec as PostgresSpec, sql, started);
+	}
+	if (spec.type === "sqlite") {
+		return runSqlite(spec as SqliteSpec, sql, started);
+	}
+	throw new Error(`Unsupported database type: ${spec.type as string}`);
 }
 
-async function runMysql(spec: ConnSpec, sql: string, started: number): Promise<LocalQueryResult> {
+interface MysqlSpec {
+	type: "mysql" | "mariadb";
+	host: string;
+	port: number;
+	user: string;
+	password: string;
+	database: string;
+	ssl?: boolean;
+}
+
+async function runMysql(spec: MysqlSpec, sql: string, started: number): Promise<LocalQueryResult> {
 	const auth = `${encodeURIComponent(spec.user)}:${encodeURIComponent(spec.password)}@`;
 	const ssl = spec.ssl ? "?ssl=true" : "";
 	const uri = `mysql://${auth}${spec.host}:${spec.port}/${spec.database}${ssl}`;
@@ -67,8 +85,23 @@ async function runMysql(spec: ConnSpec, sql: string, started: number): Promise<L
 	}
 }
 
+interface PostgresSpec {
+	type: "postgresql";
+	host: string;
+	port: number;
+	user: string;
+	password: string;
+	database: string;
+	ssl?: boolean;
+}
+
+interface SqliteSpec {
+	type: "sqlite";
+	database: string;
+}
+
 async function runPostgres(
-	spec: ConnSpec,
+	spec: PostgresSpec,
 	sql: string,
 	started: number,
 ): Promise<LocalQueryResult> {
@@ -98,5 +131,30 @@ async function runPostgres(
 		};
 	} finally {
 		await client.end();
+	}
+}
+
+async function runSqlite(
+	spec: SqliteSpec,
+	sql: string,
+	started: number,
+): Promise<LocalQueryResult> {
+	const db = new Database(spec.database, { readonly: true });
+	try {
+		const stmt = db.query<Record<string, unknown>, []>(sql);
+		const rows = stmt.all();
+		const columns = rows.length > 0 ? Object.keys(rows[0] ?? {}) : [];
+		return {
+			columns,
+			rows: rows.map((r) => {
+				const out: Record<string, unknown> = {};
+				for (const col of columns) out[col] = r[col];
+				return out;
+			}),
+			row_count: rows.length,
+			duration_ms: Date.now() - started,
+		};
+	} finally {
+		db.close();
 	}
 }

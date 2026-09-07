@@ -89,9 +89,15 @@ export function registerQuery(program: Command): void {
 				connector_id: connector.id,
 				question,
 				rows_limit: opts.rows,
-			})) as { id?: string; sql?: string };
+			})) as {
+				id?: string;
+				sql?: string;
+				sql_generated?: string | null;
+				needs_local_execution?: boolean;
+				status?: string;
+			};
 
-			const sql = createRes.sql ?? "";
+			const sql = createRes.sql_generated ?? createRes.sql ?? "";
 			const queryId = createRes.id ?? "";
 
 			if (opts.generateOnly) {
@@ -117,19 +123,22 @@ export function registerQuery(program: Command): void {
 					port: local.port,
 					user: local.user,
 					// Re-prompt for the password since we never persist it.
-					password: await readPasswordInteractive(),
+					// SQLite connectors have no credentials — skip the prompt.
+					password: local.type === "sqlite" ? "" : await readPasswordInteractive(),
 					database: local.database,
 					ssl: local.ssl,
 				},
 				sql,
 			);
 
-			// Tell the API the result so it can generate answer+chart.
-			try {
-				await client.getQuery(queryId);
-				// POST /v1/queries/:id/answer would go here — kept lightweight for v1.
-			} catch (err) {
-				if (!(err instanceof ApiError)) throw err;
+			// Tell the API the local result so it can generate answer+chart.
+			if (queryId) {
+				try {
+					await client.answerQuery({ result_data: result.rows }, queryId);
+				} catch (err) {
+					if (!(err instanceof ApiError)) throw err;
+					printError(`Could not upload result to API: ${err.message}`);
+				}
 			}
 
 			// Update the local registry so the connector has an id mapping.

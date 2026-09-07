@@ -28,7 +28,8 @@ export const HELP_COMMANDS = `
 Commands:
   login                 Authenticate with an EasySQL API key
   logout                Clear stored credentials
-  connector add         Add a local MySQL/Postgres connector
+  demo                  Generate a local sample SQLite database (local-demo)
+  connector add         Add a local MySQL/Postgres/SQLite connector
   connector sync        Re-extract and push schema metadata
   connector list        List connectors known to EasySQL
   query "<question>"    Generate SQL and run it against the local DB
@@ -56,13 +57,20 @@ Authenticate the CLI with an EasySQL API key. The key is stored in the
 local config file with 0600 permissions and used for all subsequent
 authenticated requests.
 
+By default, the command is interactive: when --api-key is missing and
+$EASYSQL_API_KEY is not set, the CLI prompts for the key with hidden echo.
+Pass --non-interactive (or -y) to disable prompts and fail with a clear
+error instead.
+
 Options:
   --api-key <key>       Provide the key inline (otherwise prompted securely)
   --api-url <url>       Override the API base URL for this login only
+  --non-interactive, -y  Disable prompts; fail when required values are missing
 
 Example:
   easysql login
   easysql login --api-key easysql_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  easysql login --non-interactive --api-key easysql_sk_xxx
 `.trim();
 
 export const HELP_LOGOUT = `
@@ -74,32 +82,51 @@ Removes the stored API key from the local config file.
 export const HELP_CONNECTOR_ADD = `
 Usage: easysql connector add [options]
 
-Connect to a LOCAL MySQL or PostgreSQL database, extract its schema
-(tables, columns, types, primary keys, foreign keys, row-count estimates),
-and push ONLY the schema metadata to EasySQL. Connection credentials are
-NEVER sent to the API — they are kept in memory for the introspection
-step and discarded.
+Connect to a LOCAL MySQL, PostgreSQL or SQLite database, extract its
+schema (tables, columns, types, primary keys, foreign keys, row-count
+estimates), and push ONLY the schema metadata to EasySQL. Connection
+credentials are NEVER sent to the API — they are kept in memory for the
+introspection step and discarded. SQLite connectors have no credentials:
+the only required parameter is the absolute file path to a .db file.
 
-Required:
+By default, the command is interactive: missing required values are
+prompted for one at a time. Pass --non-interactive (or -y) to disable
+prompts; in that mode every required flag must be supplied explicitly
+or the command exits with code 1.
+
+Required (always):
   --name <name>         Human-readable connector name
-  --type <type>         'mysql' | 'mariadb' | 'postgresql'
+  --type <type>         'mysql' | 'mariadb' | 'postgresql' | 'sqlite'
 
 Connection (one of --connection-url OR --host/--port/...):
   --connection-url <url> Full URL: mysql://user:pass@host:port/db
+                          or sqlite:///absolute/path/to.db
   --host <host>         Database host (default: 127.0.0.1)
   --port <port>         Database port (default: 3306 for MySQL, 5432 for Postgres)
   --user <user>         Database user
   --password <pass>     Database password (otherwise prompted securely)
   --database <db>       Database name
 
+SQLite-specific:
+  --file <path>         Absolute path to a local .db file
+                        (alternative to --connection-url sqlite:///...)
+
 Options:
   --ssl                 Require SSL/TLS
+  --non-interactive, -y  Disable prompts; fail when required values are missing
 
 Example:
   easysql connector add \\
     --name "Local Postgres" \\
     --type postgresql \\
     --host localhost --port 5432 --database mydb --user me
+
+  easysql connector add --name "Local SQLite" --type sqlite --file /tmp/app.db
+
+  # Fully non-interactive (CI / scripts):
+  easysql connector add --non-interactive \\
+    --name "Local Postgres" --type postgresql \\
+    --connection-url "postgresql://user:pass@host:5432/db"
 `.trim();
 
 export const HELP_CONNECTOR_SYNC = `
@@ -187,4 +214,30 @@ Usage: easysql help [command]
 
 Print help for a specific command. With no argument, prints the top-level
 help.
+`.trim();
+
+export const HELP_DEMO = `
+Usage: easysql demo [options]
+
+Generate a small, fictional sample SQLite database and register it as a
+local connector named \`local-demo\`. Useful as a low-friction on-ramp:
+you can immediately run \`easysql query "..." --connector local-demo\`
+without setting up MySQL or PostgreSQL.
+
+The generated file lives at $XDG_DATA_HOME/easysql/demo.db (or
+%LOCALAPPDATA%/easysql/demo.db on Windows) and contains 4 tables
+(customers, products, orders, order_items) with ~5/6/7/10 rows of
+deterministic sample data. Re-running the command removes and
+recreates the file, so the data is reset to the same state every time.
+
+Options:
+  --file <path>         Override the output SQLite file path
+  --name <name>         Override the connector name (default: local-demo)
+  --no-register         Only write the .db file; skip the API +
+                        connectors-store registration steps
+
+Example:
+  easysql demo
+  easysql query "Top 3 customers by revenue" --connector local-demo
+  easysql demo --file /tmp/custom.db --name staging
 `.trim();

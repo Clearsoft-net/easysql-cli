@@ -7,12 +7,8 @@ import { registerConnector } from "../commands/connector.js";
 import { registerHelp } from "../commands/help.js";
 import { registerLogin } from "../commands/login.js";
 import { registerLogout } from "../commands/logout.js";
-import {
-	registerHistory,
-	registerQuery,
-	registerUpdate,
-	registerUsage,
-} from "../commands/stubs.js";
+import { registerQuery } from "../commands/query.js";
+import { registerHistory, registerUpdate, registerUsage } from "../commands/stubs.js";
 import { setConfigPathOverride } from "../config/paths.js";
 import { HELP_COMMANDS, HELP_GLOBAL_OPTIONS, HELP_TOP } from "../i18n/help.js";
 import { setColorsEnabled, setJsonMode } from "../output/print.js";

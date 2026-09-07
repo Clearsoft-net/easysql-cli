@@ -12,6 +12,7 @@
 
 import type { Command } from "commander";
 import { CliError, NotLoggedInError } from "../cli/errors.js";
+import { upsertConnector } from "../config/connectors-store.js";
 import {
 	introspectDatabase,
 	mergeConnection,
@@ -108,6 +109,18 @@ function registerAdd(program: Command): void {
 				type: conn.type,
 				schema,
 			})) as { id?: string; name?: string };
+
+			upsertConnector({
+				id: result.id,
+				name: result.name ?? opts.name ?? "",
+				type: conn.type,
+				host: conn.host,
+				port: conn.port,
+				user: conn.user,
+				database: conn.database,
+				ssl: conn.ssl,
+				updated_at: new Date().toISOString(),
+			});
 
 			printSuccess(
 				t().success.connectorAdded(result.name ?? opts.name ?? "", result.id ?? ""),

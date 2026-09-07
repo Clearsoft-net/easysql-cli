@@ -13,19 +13,6 @@ function notImplemented(name: string) {
 	};
 }
 
-export function registerQuery(program: Command): void {
-	program
-		.command("query")
-		.description("Generate SQL and run it against the local DB")
-		.argument("<question...>", "Natural-language question")
-		.option("--connector <id|name>", "Connector to use (otherwise prompted)")
-		.option("--generate-only", "Print the SQL without executing")
-		.option("--rows <n>", "Override LIMIT", (v) => Number.parseInt(v, 10))
-		.option("--format <fmt>", "table | json | csv", "table")
-		.allowExcessArguments(true)
-		.action(notImplemented("query"));
-}
-
 export function registerUsage(program: Command): void {
 	program
 		.command("usage")

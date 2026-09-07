@@ -61,9 +61,11 @@ export async function promptSecret(question: string): Promise<string | null> {
 }
 
 /**
- * Reads a single line from stdin (echo visible). Returns null on EOF.
+ * Reads a single line from stdin (echo visible). Returns null on EOF or when
+ * stdin is not a TTY (caller should fall back to --flag or --non-interactive).
  */
 export async function promptLine(question: string): Promise<string | null> {
+	if (!isatty(0)) return null;
 	return new Promise((resolve) => {
 		const rl = readline(question);
 		rl.once("line", (line) => {
@@ -72,4 +74,18 @@ export async function promptLine(question: string): Promise<string | null> {
 		});
 		rl.once("close", () => resolve(null));
 	});
+}
+
+/**
+ * Reads a single line from stdin with a default value used when the user
+ * just hits Enter. Echo visible. Returns null on EOF / non-TTY.
+ */
+export async function promptLineDefault(
+	question: string,
+	defaultValue: string,
+): Promise<string | null> {
+	const answer = await promptLine(question);
+	if (answer === null) return null;
+	const trimmed = answer.trim();
+	return trimmed.length === 0 ? defaultValue : trimmed;
 }

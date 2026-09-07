@@ -1,11 +1,11 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
-	type HistoryEntry,
 	appendHistory,
 	clearHistory,
+	type HistoryEntry,
 	readHistory,
 } from "../src/history/store.js";
 import { setDataDirOverride } from "./_helpers.js";

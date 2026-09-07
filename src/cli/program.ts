@@ -14,6 +14,7 @@ import { registerUsage } from "../commands/usage.js";
 import { setConfigPathOverride } from "../config/paths.js";
 import { HELP_COMMANDS, HELP_GLOBAL_OPTIONS, HELP_TOP } from "../i18n/help.js";
 import { setColorsEnabled, setJsonMode } from "../output/print.js";
+import { startRepl } from "../tui/repl.js";
 import { VERSION } from "../version.js";
 import type { GlobalOptions } from "./global-options.js";
 
@@ -32,7 +33,13 @@ export function buildProgram(): Command {
 		.option("--json", "Output machine-readable JSON")
 		.option("--no-color", "Disable ANSI colors")
 		.showHelpAfterError(true)
-		.exitOverride();
+		.exitOverride()
+		.action(async (_opts, command) => {
+			// Bare 'easysql' (no subcommand) opens the interactive TUI shell.
+			const parentOpts = (command.parent?.opts() ?? {}) as { connector?: string };
+			const code = await startRepl({ connector: parentOpts.connector });
+			if (code !== 0) process.exit(code);
+		});
 
 	// Pre-action: apply global flags before any subcommand runs.
 	program.hook("preAction", (_thisCommand, actionCommand) => {

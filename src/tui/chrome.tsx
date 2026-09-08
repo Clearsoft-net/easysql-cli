@@ -68,6 +68,7 @@ const TABS: Tab[] = [
 ];
 
 export function TabBar({ active }: { active: ScreenName }) {
+	const idx = TABS.findIndex((t) => t.value === active);
 	return (
 		<Box
 			flexDirection="row"
@@ -79,35 +80,36 @@ export function TabBar({ active }: { active: ScreenName }) {
 			paddingX={1}
 			flexShrink={0}
 		>
+			<Text dimColor>{"◀ "}</Text>
 			{TABS.map((tab) => {
 				const isActive = tab.value === active;
 				return (
 					<Box key={tab.value} marginRight={3}>
 						<Text color={isActive ? "cyan" : "gray"} bold={isActive}>
-							{isActive ? "▸ " : "  "}{tab.name}
+							{isActive ? "▸ " : "  "}
+							{tab.name}
 						</Text>
 					</Box>
 				);
 			})}
+			<Text dimColor>{" ▶"}</Text>
 		</Box>
 	);
 }
 
 interface FooterProps {
 	screen: ScreenName;
-	paletteOpen: boolean;
 }
 
-const PALETTE_OPEN_HINT = "[Tab/Esc] close palette";
-const PALETTE_CLOSED_HINT = "[Tab] command palette · [?] help · [Ctrl-C] quit";
+const GLOBAL_HINTS = "[Tab] next screen · Shift+Tab previous · [/] commands · [Ctrl-C] quit";
 
 const SCREEN_HINTS: Record<ScreenName, string> = {
 	connectors: "↑/↓ or j/k navigate · Enter activate",
 	history: "←/→ or h/l switch page",
-	question: "Type · Enter submit · Backspace delete",
+	question: "Type · Enter submit · Backspace delete · / for commands",
 };
 
-export function Footer({ screen, paletteOpen }: FooterProps) {
+export function Footer({ screen }: FooterProps) {
 	return (
 		<Box
 			flexDirection="column"
@@ -123,11 +125,7 @@ export function Footer({ screen, paletteOpen }: FooterProps) {
 				<Text dimColor>{SCREEN_HINTS[screen]}</Text>
 			</Box>
 			<Box>
-				{paletteOpen ? (
-					<Text color="magenta">{PALETTE_OPEN_HINT}</Text>
-				) : (
-					<Text dimColor>{PALETTE_CLOSED_HINT}</Text>
-				)}
+				<Text dimColor>{GLOBAL_HINTS}</Text>
 			</Box>
 		</Box>
 	);

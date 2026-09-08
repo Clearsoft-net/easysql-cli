@@ -188,16 +188,17 @@ Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CO
 ## TUI (ink-based)
 
 - `easysql` (sem subcomando) abre um shell interativo com React/ink (`src/tui/`).
-- 4 telas: **Connectors**, **History**, **Question**, **Help** modal. **Command palette** modal para os atalhos `1/2/3/?/q`.
-- Chrome (`src/tui/chrome.tsx`): **Header** com nome + versão + conector + URL da API + status online/offline; **TabBar** com a tela ativa destacada (▸); **Footer** com hints contextuais da tela atual e globais.
+- 4 telas: **Connectors**, **History**, **Question**, **Help** modal.
+- Chrome (`src/tui/chrome.tsx`): **Header** com nome + versão + conector + URL da API + status online/offline; **TabBar** com `◀` / `▸` / `▶` setas sinalizando a posição e a tela ativa destacada em negrito; **Footer** com hints contextuais da tela atual e globais.
 - Renderiza em **alternate screen buffer** (vim/htop-style: ocupa o terminal e restaura o scrollback ao sair).
-- **Modelo de atalhos (input-focus aware):** enquanto o usuário está digitando na tela Question, o handler global do App só consome `Esc`, `Ctrl-C`, e `Tab` (abre o command palette). Números/letras passam direto para o buffer — `"qual o cliente tem 3 anos?"` não é interrompido pelo `q`/`?`/`3`. Fora do input-focus (Connectors/History/screens não-digitáveis) os atalhos são consumidos diretamente.
+- **Modelo de atalhos:** `Tab` / `Shift-Tab` ciclam entre Connectors → History → Question (única tecla de navegação global). Ações que começam com `/`: digitando `/` no input da Question screen abre um mini slash-prompt que aceita `/help`, `/quit`, `/connectors`, `/history`, `/question`, `/clear`. Caracteres comuns (`1`, `2`, `3`, `q`, `?`) passam direto pro buffer — `"qual o cliente tem 3 anos?"` não é interrompido.
 - O **Question** screen usa `useInput` local pra montar o buffer de texto e chama o mesmo pipeline de domínio (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — não duplica lógica.
 - Keybindings:
   - Connectors: `j/k` ou `↑/↓` navegam, `Enter` ativa
   - History: `h/l` ou `←/→` paginam
   - Question: digita a pergunta, `Enter` envia, `Backspace` apaga
-  - Globais: `Tab` (palette), `Esc` (fecha overlay), `Ctrl-C` (quit)
+  - Globais: `Tab` (próxima tela), `Shift-Tab` (anterior), `Ctrl-C` (quit), `Esc` (fecha overlay)
+  - Slash-prompt: `/help` `/quit` `/connectors` `/history` `/question` `/clear`
 - Tests em `tests/tui.test.tsx` usam `ink-testing-library` (PassThrough stdin).
 - Sem TTY: `repl.ts` rejeita com mensagem instruindo `easysql query "..."`.
 
@@ -218,7 +219,7 @@ Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CO
 ```bash
 bun install --frozen-lockfile   # lockfile é obrigatório no CI
 bun run check                   # biome + tsc --noEmit (lint+typecheck)
-bun test                        # 94 specs (sqlite + demo + TUI inclusos)
+bun test                        # 97 specs (sqlite + demo + TUI inclusos)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
 ./bin/easysql --help            # smoke
@@ -228,7 +229,7 @@ make build-compile              # bun --compile → bin/easysql
 
 ## Estado atual
 
-- 94/94 testes passando (`bun test`).
+- 97/97 testes passando (`bun test`).
 - `bun run check` limpo (warnings menores de `noExplicitAny` em SDK wrapper e 1 `useImportType` — não bloqueiam).
 - Binário standalone `bin/easysql` já construído (~92 MB).
 - `bin/` e `dist/` estão no `.gitignore` — não comitar.

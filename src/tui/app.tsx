@@ -1,26 +1,21 @@
 /**
  * Top-level TUI shell (ink-based). Renders the chrome (header + tab bar
- * + footer) around the active screen slot, plus a help modal overlay
- * and a command palette.
+ * + footer) around the active screen slot, plus a help modal overlay.
  *
- * Always-on global shortcuts (work even while typing into the Question
- * screen — these are the keys that never appear in normal text):
- *   Ctrl-C  — quit
- *   Esc     — close whatever overlay is on top (palette / help)
- *   Tab     — open the command palette
+ * Keybindings:
+ *   Tab / Shift-Tab — cycle between Connectors / History / Question.
+ *   Ctrl-C          — quit immediately.
+ *   Esc             — close the help modal.
  *
- * While the palette is open (after Tab), number / letter shortcuts are
- * consumed:
- *   1 — Connectors  (list + j/k navigation, Enter to activate)
- *   2 — History     (paginated local history)
- *   3 — Question    (textarea + generate SQL + execute locally + render table)
- *   ? — Help modal
- *   q — Quit
+ * Inside any screen, `/` opens a transient slash-prompt at the bottom
+ * where the user can type slash-commands. The Question screen has its
+ * own normal typing input; the slash-prompt is the only place where
+ * `/help`, `/quit`, `/connectors`, etc. are consumed.
  *
  * The design avoids the classic TUI problem where global shortcuts eat
- * characters a user is trying to type: while the Question screen has
- * focus, only Esc / Ctrl-C / Tab reach the App-level handler. Every
- * other key flows through to the Question screen's useInput.
+ * characters a user is trying to type — Tab is the only navigation key
+ * reachable from anywhere, and every other character flows through to
+ * the active screen's useInput.
  *
  * No external TUI dependencies beyond `ink` + `react`. All domain logic
  * stays in `src/db/`, `src/sdk/`, `src/config/` — this file is pure UI.
@@ -42,6 +37,15 @@ import { QuestionScreen } from "./screens/question.js";
 
 export type ScreenName = "connectors" | "history" | "question";
 
+const SCREENS: ScreenName[] = ["connectors", "history", "question"];
+
+export function nextScreen(current: ScreenName, reverse = false): ScreenName {
+	const idx = SCREENS.indexOf(current);
+	const step = reverse ? -1 : 1;
+	const next = (idx + step + SCREENS.length) % SCREENS.length;
+	return SCREENS[next] as ScreenName;
+}
+
 interface AppProps {
 	initialConnector?: string;
 }
@@ -50,9 +54,8 @@ export function App({ initialConnector }: AppProps) {
 	const { exit } = useApp();
 	const [screen, setScreen] = useState<ScreenName>("question");
 	const [helpOpen, setHelpOpen] = useState(false);
-	const [paletteOpen, setPaletteOpen] = useState(false);
-	// Set true while the Question screen is mid-query so a stray Tab
-	// from the user doesn't yank focus away from in-flight work.
+	// While the Question screen is mid-query, suppress the Tab cycle
+	// so a stray keypress doesn't yank focus away from in-flight work.
 	const [questionBusy, setQuestionBusy] = useState(false);
 	const [active, setActive] = useState<string | undefined>(() => {
 		if (initialConnector) {
@@ -63,82 +66,30 @@ export function App({ initialConnector }: AppProps) {
 	});
 	const cfg = loadConfig();
 
-	// The Question screen has input focus by default — number / letter
-	// shortcuts are routed through the palette so they don't intercept
-	// typed characters (e.g. "qual o cliente mais novo?" contains 'q').
-	const inputFocused = screen === "question" && !questionBusy;
-
 	useInput((input, key) => {
-		// Always-on: Ctrl-C quits regardless of state.
 		if (key.ctrl && input === "c") {
 			exit();
 			return;
 		}
 
-		// Esc closes whichever overlay is on top.
-		if (key.escape) {
-			if (helpOpen) setHelpOpen(false);
-			else if (paletteOpen) setPaletteOpen(false);
-			return;
-		}
-
-		// Inside the palette, every key is consumed for navigation.
-		if (paletteOpen) {
-			if (input === "1") {
-				setScreen("connectors");
-				setPaletteOpen(false);
-				return;
-			}
-			if (input === "2") {
-				setScreen("history");
-				setPaletteOpen(false);
-				return;
-			}
-			if (input === "3") {
-				setScreen("question");
-				setPaletteOpen(false);
-				return;
-			}
-			if (input === "?") {
-				setHelpOpen(true);
-				setPaletteOpen(false);
-				return;
-			}
-			if (input === "q") {
-				exit();
-				return;
-			}
-			// Any other key closes the palette so a stray character
-			// typed while waiting for a selection isn't lost.
-			setPaletteOpen(false);
-			return;
-		}
-
 		if (helpOpen) {
-			if (input === "?") setHelpOpen(false);
+			if (key.escape || input === "/") setHelpOpen(false);
 			return;
 		}
 
-		// Input-focus mode: only Tab to open the palette; every other
-		// key flows through to the Question screen's useInput.
-		if (inputFocused) {
-			if (key.tab) setPaletteOpen(true);
+		// Tab / Shift-Tab cycle the active screen. We allow Tab even
+		// while the Question screen has input focus so the user can
+		// hop to Connectors without losing the buffer — but only when
+		// the Question screen isn't mid-query.
+		const inputBusy = screen === "question" && questionBusy;
+		if (!inputBusy && key.tab) {
+			setScreen((cur) => nextScreen(cur, key.shift));
 			return;
 		}
 
-		// Outside input focus (Connectors / History screens): full set.
-		if (key.tab) {
-			setPaletteOpen(true);
-			return;
-		}
-		if (input === "?") {
-			setHelpOpen(true);
-			return;
-		}
-		if (input === "q") {
-			exit();
-			return;
-		}
+		// Esc on the Question screen is just a no-op for the buffer
+		// (the screen's own useInput ignores it).
+		void input;
 	});
 
 	const activeConnector: StoredConnector | undefined = active
@@ -161,43 +112,19 @@ export function App({ initialConnector }: AppProps) {
 				)}
 				{screen === "history" && <HistoryScreen />}
 				{screen === "question" && active && (
-					<QuestionScreen connector={active} onBusyChange={setQuestionBusy} />
+					<QuestionScreen
+						connector={active}
+						onBusyChange={setQuestionBusy}
+						onSwitchScreen={setScreen}
+						onOpenHelp={() => setHelpOpen(true)}
+						onQuit={() => exit()}
+					/>
 				)}
 				{screen === "question" && !active && (
 					<Text color="yellow">Pick a connector first.</Text>
 				)}
 			</Box>
-			<Footer screen={screen} paletteOpen={paletteOpen} />
-
-			{paletteOpen && (
-				<Box
-					position="absolute"
-					borderStyle="double"
-					borderColor="magenta"
-					paddingX={2}
-					flexDirection="column"
-				>
-					<Text bold color="magenta">
-						Command palette (Tab/Esc to close)
-					</Text>
-					<Text> </Text>
-					<Text>
-						<Text color="cyan">[1]</Text> Connectors
-					</Text>
-					<Text>
-						<Text color="cyan">[2]</Text> History
-					</Text>
-					<Text>
-						<Text color="cyan">[3]</Text> Question
-					</Text>
-					<Text>
-						<Text color="cyan">[?]</Text> Help
-					</Text>
-					<Text>
-						<Text color="cyan">[q]</Text> Quit
-					</Text>
-				</Box>
-			)}
+			<Footer screen={screen} />
 
 			{helpOpen && (
 				<Box

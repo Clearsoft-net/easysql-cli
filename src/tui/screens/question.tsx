@@ -3,7 +3,20 @@
  * EasySQL API, execute it locally against the active connector, and
  * render the result table inline.
  *
- * Uses ink's `useInput` to build up a buffer; Enter triggers the flow.
+ * The input box accepts free text. Typing `/` switches the input into
+ * slash-command mode: a prompt appears below the box with `/` already
+ * typed, and subsequent characters are interpreted as a command. Enter
+ * runs the command; Esc or backspacing the `/` returns to question mode.
+ *
+ * Slash commands recognised here:
+ *   /help             — open the help overlay (App-level)
+ *   /quit             — quit the TUI
+ *   /connectors       — switch to Connectors
+ *   /history          — switch to History
+ *   /question         — switch to Question (no-op)
+ *   /clear            — clear the buffer + result panel
+ *   /<anything-else>  — unknown command, stays in slash mode with a hint
+ *
  * Errors are surfaced as inline text (no console.log side-effects).
  */
 
@@ -18,12 +31,16 @@ import { appendHistory } from "../../history/store.js";
 import { renderResult } from "../../output/table.js";
 import { getSavedClient } from "../../sdk/client.js";
 import { promptSecret } from "../../util/prompt.js";
+import type { ScreenName } from "../app.js";
 
 type Status = "idle" | "generating" | "executing" | "ok" | "error";
 
 interface Props {
 	connector: string;
 	onBusyChange?: (busy: boolean) => void;
+	onSwitchScreen?: (s: ScreenName) => void;
+	onOpenHelp?: () => void;
+	onQuit?: () => void;
 }
 
 interface QueryResponse {
@@ -41,8 +58,54 @@ async function readPasswordInteractive(): Promise<string> {
 	return secret;
 }
 
-export function QuestionScreen({ connector, onBusyChange }: Props) {
+type SlashCmd =
+	| { kind: "help" }
+	| { kind: "quit" }
+	| { kind: "screen"; screen: ScreenName }
+	| { kind: "clear" };
+
+function parseSlash(cmd: string): SlashCmd | { kind: "unknown"; raw: string } {
+	const lower = cmd.trim().toLowerCase();
+	if (lower === "" || lower === "/") return { kind: "unknown", raw: cmd };
+	switch (lower.replace(/^\//, "")) {
+		case "help":
+		case "h":
+		case "?":
+			return { kind: "help" };
+		case "quit":
+		case "q":
+		case "exit":
+			return { kind: "quit" };
+		case "connectors":
+		case "c":
+		case "1":
+			return { kind: "screen", screen: "connectors" };
+		case "history":
+		case "h2":
+		case "2":
+			return { kind: "screen", screen: "history" };
+		case "question":
+		case "q2":
+		case "3":
+			return { kind: "screen", screen: "question" };
+		case "clear":
+		case "cls":
+			return { kind: "clear" };
+		default:
+			return { kind: "unknown", raw: cmd };
+	}
+}
+
+export function QuestionScreen({
+	connector,
+	onBusyChange,
+	onSwitchScreen,
+	onOpenHelp,
+	onQuit,
+}: Props) {
 	const [buf, setBuf] = useState("");
+	const [slashBuf, setSlashBuf] = useState<string | null>(null);
+	const [slashHint, setSlashHint] = useState<string | null>(null);
 	const [status, setStatus] = useState<Status>("idle");
 	const [sql, setSql] = useState<string | null>(null);
 	const [result, setResult] = useState<LocalQueryResult | null>(null);
@@ -55,6 +118,68 @@ export function QuestionScreen({ connector, onBusyChange }: Props) {
 
 	useInput((input, key) => {
 		if (busy) return;
+
+		// Slash-command mode.
+		if (slashBuf !== null) {
+			if (key.return) {
+				const parsed = parseSlash(slashBuf);
+				switch (parsed.kind) {
+					case "help":
+						onOpenHelp?.();
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
+					case "quit":
+						onQuit?.();
+						return;
+					case "screen":
+						onSwitchScreen?.(parsed.screen);
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
+					case "clear":
+						setBuf("");
+						setSql(null);
+						setResult(null);
+						setErr(null);
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
+					case "unknown":
+						setSlashHint(`Unknown command: /${parsed.raw.slice(1) || ""}`);
+						// keep slashBuf so the user can edit
+						return;
+				}
+			}
+			if (key.escape) {
+				setSlashBuf(null);
+				setSlashHint(null);
+				return;
+			}
+			if (key.backspace || key.delete) {
+				setSlashBuf((s) => {
+					if (s === null) return null;
+					const next = s.slice(0, -1);
+					if (next === "" || next === "/") {
+						setSlashHint(null);
+						return null;
+					}
+					return next;
+				});
+				return;
+			}
+			// Don't echo `/` more than once.
+			if (input === "/") return;
+			if (input && !key.ctrl && !key.meta && !key.tab) {
+				// Strip any leading `/` already in the buffer (defence
+				// against pasted multi-char input).
+				const rest = input.replace(/^\/+/, "");
+				setSlashBuf((s) => (s ?? "") + rest);
+			}
+			return;
+		}
+
+		// Normal question-mode input.
 		if (key.return) {
 			const question = buf.trim();
 			if (question.length === 0) return;
@@ -65,9 +190,18 @@ export function QuestionScreen({ connector, onBusyChange }: Props) {
 			setBuf((s) => s.slice(0, -1));
 			return;
 		}
-		// Reserve Tab / Esc / Ctrl for global shortcuts (palette, modal,
-		// quit) — they are consumed by the App-level handler.
+		// Tab is the global screen-cycle key — never append to the buffer.
 		if (key.tab || key.escape || key.ctrl || key.meta) return;
+
+		if (input.includes("/")) {
+			// Switch into slash-command mode. We accept the whole input
+			// as the slash buffer so pasted strings ("/help", "/quit")
+			// and the test harness (which batches chars into one event)
+			// both work.
+			setSlashBuf(input);
+			setSlashHint(null);
+			return;
+		}
 		if (input) {
 			setBuf((s) => s + input);
 		}
@@ -143,8 +277,21 @@ export function QuestionScreen({ connector, onBusyChange }: Props) {
 			<Text bold>Ask a question</Text>
 			<Box borderStyle="round" borderColor="green" paddingX={1}>
 				<Text color="green">›</Text>
-				<Text> {buf.length === 0 ? <Text dimColor>(type, hit Enter)</Text> : buf}</Text>
+				<Text> {buf.length === 0 ? <Text dimColor>(type, hit Enter · / for commands)</Text> : buf}</Text>
 			</Box>
+
+			{slashBuf !== null && (
+				<Box marginTop={1} flexDirection="column">
+					<Box borderStyle="round" borderColor="magenta" paddingX={1}>
+						<Text color="magenta">/</Text>
+						<Text> {slashBuf.length === 1 ? <Text dimColor>(help, quit, connectors, history, clear)</Text> : slashBuf.slice(1)}</Text>
+					</Box>
+					{slashHint && (
+						<Text color="yellow"> {slashHint}</Text>
+					)}
+					<Text dimColor> Enter to run · Esc to cancel · Backspace to edit</Text>
+				</Box>
+			)}
 
 			<Box marginTop={1} flexDirection="column">
 				{status === "generating" && <Text color="cyan">Generating SQL…</Text>}

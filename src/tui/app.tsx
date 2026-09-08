@@ -1,6 +1,6 @@
 /**
- * Top-level TUI shell (ink-based). Renders the header, the active screen,
- * and a status bar with keybindings.
+ * Top-level TUI shell (ink-based). Renders the chrome (header + tab bar
+ * + footer) around the active screen slot, plus a help modal overlay.
  *
  *   1 — Connectors  (list + j/k navigation, Enter to activate)
  *   2 — History     (paginated local history)
@@ -14,7 +14,13 @@
 
 import { Box, Text, useApp, useInput } from "ink";
 import { useState } from "react";
-import { findConnectorByName, loadConnectors } from "../config/connectors-store.js";
+import {
+	findConnectorByName,
+	loadConnectors,
+	type StoredConnector,
+} from "../config/connectors-store.js";
+import { loadConfig } from "../config/store.js";
+import { Footer, Header, TabBar } from "./chrome.js";
 import { ConnectorsScreen } from "./screens/connectors.js";
 import { HelpScreen } from "./screens/help.js";
 import { HistoryScreen } from "./screens/history.js";
@@ -37,6 +43,7 @@ export function App({ initialConnector }: AppProps) {
 		const list = loadConnectors();
 		return list.length === 1 ? list[0]?.name : undefined;
 	});
+	const cfg = loadConfig();
 
 	useInput((input, key) => {
 		if (key.ctrl && input === "c") {
@@ -70,36 +77,31 @@ export function App({ initialConnector }: AppProps) {
 		}
 	});
 
+	const activeConnector: StoredConnector | undefined = active
+		? findConnectorByName(active)
+		: undefined;
+	const apiUrl = cfg.api_url || undefined;
+
 	return (
 		<Box flexDirection="column" height="100%">
-			<Box borderStyle="round" borderColor="cyan" paddingX={1} flexShrink={0}>
-				<Text bold color="cyan">
-					easysql
-				</Text>
-				<Text> — </Text>
-				<Text color={active ? "green" : "yellow"}>
-					{active ? `connector: ${active}` : "no connector selected"}
-				</Text>
-			</Box>
-
-			<Box flexDirection="row" paddingX={1} flexShrink={0}>
-				<Text dimColor>
-					[1] Connectors · [2] History · [3] Question · [?] Help · [q] Quit
-				</Text>
-			</Box>
-
-			<Box flexDirection="column" flexGrow={1} overflow="hidden">
+			<Header
+				active={active}
+				connectorType={activeConnector?.type}
+				apiUrl={apiUrl}
+				online={cfg.api_key.length > 0}
+			/>
+			<TabBar active={screen} />
+			<Box flexDirection="column" flexGrow={1} overflow="hidden" paddingX={1}>
 				{screen === "connectors" && (
 					<ConnectorsScreen active={active} onSelect={setActive} />
 				)}
 				{screen === "history" && <HistoryScreen />}
 				{screen === "question" && active && <QuestionScreen connector={active} />}
 				{screen === "question" && !active && (
-					<Box paddingX={1} flexDirection="column">
-						<Text color="yellow">Pick a connector first (press [1]).</Text>
-					</Box>
+					<Text color="yellow">Pick a connector first (press 1).</Text>
 				)}
 			</Box>
+			<Footer screen={screen} />
 
 			{helpOpen && (
 				<Box

@@ -25,25 +25,32 @@ afterEach(() => {
 });
 
 describe("TUI App", () => {
-	it("renders the header and key bar on first paint", () => {
+	it("renders the chrome (header + tabs + footer) on first paint", () => {
 		const { lastFrame } = render(<App />);
 		const frame = lastFrame();
+		// Header
 		expect(frame).toContain("easysql");
+		expect(frame).toContain("connector:");
+		expect(frame).toContain("no connector selected");
+		// Tab bar — all three tabs present, the active one prefixed with ▸
 		expect(frame).toContain("[1] Connectors");
 		expect(frame).toContain("[2] History");
 		expect(frame).toContain("[3] Question");
-		expect(frame).toContain("[?] Help");
-		expect(frame).toContain("[q] Quit");
+		expect(frame).toContain("▸ [3] Question");
+		// Footer — screen hint + global hints
+		expect(frame).toContain("[1/2/3] switch");
+		expect(frame).toContain("[?] help");
+		expect(frame).toContain("[q] quit");
 	});
 
 	it("switches to the History screen when 2 is pressed", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("2");
-		// Let React flush the state update
 		await new Promise((r) => setTimeout(r, 50));
 		const frame = lastFrame();
-		expect(frame).toContain("History");
-		expect(frame).toMatch(/History — page \d+\/\d+/);
+		expect(frame).toContain("▸ [2] History");
+		expect(frame).toContain("History — page");
+		expect(frame).toContain("←/→ or h/l switch page");
 	});
 
 	it("opens the help modal on ? and dismisses on ?", async () => {
@@ -54,6 +61,20 @@ describe("TUI App", () => {
 		stdin.write("?");
 		await new Promise((r) => setTimeout(r, 50));
 		expect(lastFrame()).not.toContain("keybindings");
+	});
+
+	it("shows screen-specific hints for Connectors", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("1");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("↑/↓ or j/k navigate");
+	});
+
+	it("shows screen-specific hints for Question", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		// The Question screen is already the default, but the hint should
+		// still reflect it
+		expect(lastFrame()).toContain("Type · Enter submit · Backspace delete");
 	});
 
 	it("renders the Question empty state when there are no connectors", () => {

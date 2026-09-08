@@ -91,8 +91,9 @@ src/
 ├── history/
 │   └── store.ts                # appendHistory/readHistory/clearHistory (jsonl, 0600)
 ├── tui/
-│   ├── app.tsx                 # ink Router — header + key bar + screen + help modal
-│   ├── mount.tsx               # wrapper JSX que chama ink render(<App />)
+│   ├── app.tsx                 # ink Router — chrome + screen slot + help modal
+│   ├── chrome.tsx              # Header / TabBar / Footer estáticos
+│   ├── mount.tsx               # wrapper JSX que chama ink render(<App />, alternateScreen)
 │   ├── repl.ts                 # startRepl() — verifica TTY e delega ao mount
 │   └── screens/
 │       ├── connectors.tsx      # lista + j/k + Enter ativa
@@ -188,6 +189,8 @@ Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CO
 
 - `easysql` (sem subcomando) abre um shell interativo com React/ink (`src/tui/`).
 - 4 telas: **Connectors** (`1`), **History** (`2`), **Question** (`3`), **Help** modal (`?`). `q` sai, `Ctrl-C` força.
+- Chrome (`src/tui/chrome.tsx`): **Header** com nome + versão + conector + URL da API + status online/offline; **TabBar** com a tela ativa destacada (▸); **Footer** com hints contextuais da tela atual e globais.
+- Renderiza em **alternate screen buffer** (vim/htop-style: ocupa o terminal e restaura o scrollback ao sair).
 - O **Question** screen usa `useInput` local pra montar o buffer de texto e chama o mesmo pipeline de domínio (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — não duplica lógica.
 - Keybindings:
   - Connectors: `j/k` ou `↑/↓` navegam, `Enter` ativa
@@ -223,7 +226,7 @@ make build-compile              # bun --compile → bin/easysql
 
 ## Estado atual
 
-- 90/90 testes passando (`bun test`).
+- 92/92 testes passando (`bun test`).
 - `bun run check` limpo (warnings menores de `noExplicitAny` em SDK wrapper e 1 `useImportType` — não bloqueiam).
 - Binário standalone `bin/easysql` já construído (~92 MB).
 - `bin/` e `dist/` estão no `.gitignore` — não comitar.

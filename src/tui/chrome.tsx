@@ -33,38 +33,37 @@ export function Header({ active, connectorType, apiUrl, online }: HeaderProps) {
 
 	return (
 		<Box
-			borderStyle="double"
+			borderStyle="single"
 			borderColor="cyan"
-			paddingX={2}
-			paddingY={0}
+			borderTop={false}
+			borderLeft={false}
+			borderRight={false}
+			paddingX={1}
 			flexShrink={0}
-			flexDirection="column"
+			flexDirection="row"
+			justifyContent="space-between"
 		>
-			<Box flexDirection="row" justifyContent="space-between">
-				<Box>
-					<Text bold color="cyan">
-						easysql
-					</Text>
-					<Text dimColor> v{VERSION}</Text>
-					<Text>  ─  ask your database in natural language</Text>
-				</Box>
-				<Box>
-					<Text>
-						connector:{" "}
-						<Text color={active ? "green" : "yellow"} bold={!active}>
-							{connectorLabel}
-						</Text>
-					</Text>
-				</Box>
+			<Box>
+				<Text bold color="cyan">
+					easysql
+				</Text>
 			</Box>
-			<Box flexDirection="row" justifyContent="flex-end">
+			<Box>
+				<Text>
+					<Text dimColor>connector: </Text>
+					<Text color={active ? "green" : "yellow"} bold={!active}>
+						{connectorLabel}
+					</Text>
+				</Text>
+				<Text dimColor>  │  {VERSION}</Text>
 				{apiUrl && (
 					<Text dimColor>
+						{"  "}
 						{apiUrl.replace(/^https?:\/\//, "")}
-						{"   "}
 					</Text>
 				)}
 				<Text color={online ? "green" : "red"}>
+					{"  "}
 					{online ? "● online" : "○ offline"}
 				</Text>
 			</Box>

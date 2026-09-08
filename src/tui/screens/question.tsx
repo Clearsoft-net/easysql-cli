@@ -283,12 +283,10 @@ export function QuestionScreen({
 
 			{showWelcome && (
 				<Box marginTop={1} flexDirection="column">
-					<Text dimColor>Try one of these:</Text>
+					<Text dimColor>Examples:</Text>
 					<Text color="cyan">  • Top 10 customers by revenue</Text>
-					<Text color="cyan">  • How many orders were placed last week?</Text>
-					<Text color="cyan">  • List products with stock below 50</Text>
-					<Text> </Text>
-					<Text dimColor>Or type /help for commands, /quit to exit.</Text>
+					<Text color="cyan">  • How many orders last week?</Text>
+					<Text color="cyan">  • Products with low stock</Text>
 				</Box>
 			)}
 

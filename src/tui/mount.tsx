@@ -15,5 +15,6 @@ export function mountTui(opts: MountOptions) {
 	return render(<App initialConnector={opts.connector} />, {
 		exitOnCtrlC: true,
 		patchConsole: true,
+		alternateScreen: true,
 	});
 }

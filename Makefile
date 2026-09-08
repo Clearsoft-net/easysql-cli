@@ -9,7 +9,7 @@ CLI_BIN       := $(BIN_DIR)/easysql
 # ---------------------------------------------------------------------------
 # .PHONY targets (strictly alphabetical)
 # ---------------------------------------------------------------------------
-.PHONY: build build-compile check clean help install lint lint-fix release-binaries test test-watch typecheck
+.PHONY: build build-compile check clean help install lint lint-fix release-binaries run test test-watch typecheck
 
 # ---------------------------------------------------------------------------
 # help (default) — auto-generated menu
@@ -58,6 +58,12 @@ test-watch: ## Run tests in watch mode
 # ---------------------------------------------------------------------------
 release-binaries: ## Build binaries for all platforms (linux/darwin x x64/arm64)
 	bun run scripts/release-binaries.ts
+
+# ---------------------------------------------------------------------------
+# Run
+# ---------------------------------------------------------------------------
+run: build-compile ## Compile and launch the interactive TUI
+	$(CLI_BIN)
 
 # ---------------------------------------------------------------------------
 # Setup

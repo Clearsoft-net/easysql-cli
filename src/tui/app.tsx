@@ -73,7 +73,7 @@ export function App({ initialConnector }: AppProps) {
 		}
 
 		if (helpOpen) {
-			if (key.escape || input === "/") setHelpOpen(false);
+			if (key.escape || input === "?") setHelpOpen(false);
 			return;
 		}
 
@@ -84,6 +84,14 @@ export function App({ initialConnector }: AppProps) {
 		const inputBusy = screen === "question" && questionBusy;
 		if (!inputBusy && key.tab) {
 			setScreen((cur) => nextScreen(cur, key.shift));
+			return;
+		}
+
+		// '?' toggles the help overlay, but only outside the Question
+		// screen — there '?' belongs to the typed buffer (that's the
+		// whole point of the slash-prompt design).
+		if (screen !== "question" && input === "?") {
+			setHelpOpen(true);
 			return;
 		}
 

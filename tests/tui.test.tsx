@@ -159,4 +159,23 @@ describe("TUI App", () => {
 		const { lastFrame } = render(<App />);
 		expect(lastFrame()).toContain("No connector selected");
 	});
+
+	it("frame fills the full terminal height (regression: no black gap above the TUI)", () => {
+		const { lastFrame } = render(<App />);
+		const lines = (lastFrame() ?? "").split("\n");
+		// Regression guard for the "huge black space on top of the TUI" bug.
+		// ink-testing-library reports a 24-row terminal (its fake Stdout has
+		// no `rows`, so ink falls back to 24). The root Box must stretch to
+		// that full height. The bug was height="100%", which ink resolves to
+		// the content's *natural* height (~16 rows) because the root's own
+		// height is auto — so on a tall terminal the short frame floated at
+		// the bottom, leaving a big black gap on top whenever the
+		// alternate-screen buffer (1049h) was unavailable. The fix pins the
+		// frame to the measured terminal height via useWindowSize().
+		// Asserting the frame spans >= 24 rows (vs the buggy ~16) catches it.
+		expect(lines.length).toBeGreaterThanOrEqual(24);
+		// Header pinned to the very first row, footer to the very last.
+		expect(lines[0]).toContain("easysql");
+		expect(lines[lines.length - 1]).toContain("[Tab] next screen");
+	});
 });

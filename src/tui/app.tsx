@@ -121,7 +121,18 @@ export function App({ initialConnector }: AppProps) {
 					/>
 				)}
 				{screen === "question" && !active && (
-					<Text color="yellow">Pick a connector first.</Text>
+					<Box flexDirection="column">
+						<Text bold color="yellow">
+							No connector selected
+						</Text>
+						<Text> </Text>
+						<Text>
+							Press <Text color="cyan">[Tab]</Text> to switch to Connectors
+							and pick one with <Text color="cyan">Enter</Text>.
+						</Text>
+						<Text> </Text>
+						<Text dimColor>Or run `easysql demo` outside the TUI to generate one.</Text>
+					</Box>
 				)}
 			</Box>
 			<Footer screen={screen} />

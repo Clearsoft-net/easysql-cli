@@ -157,6 +157,6 @@ describe("TUI App", () => {
 			fs.unlinkSync(join(tmpDir, "connectors.json"));
 		}
 		const { lastFrame } = render(<App />);
-		expect(lastFrame()).toContain("Pick a connector first");
+		expect(lastFrame()).toContain("No connector selected");
 	});
 });

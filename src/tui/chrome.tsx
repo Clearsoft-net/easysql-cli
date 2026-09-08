@@ -17,6 +17,15 @@ interface HeaderProps {
 	online?: boolean;
 }
 
+/**
+ * Header — full-width banner above the tab bar. Three rows:
+ *   1. easysql mark + tagline
+ *   2. active connector (or "no connector selected")
+ *   3. API host + online/offline dot
+ *
+ * Two-column layout: left column is the brand, right column is the
+ * status. Border is double to make it feel like a dashboard header.
+ */
 export function Header({ active, connectorType, apiUrl, online }: HeaderProps) {
 	const connectorLabel = active
 		? `${active}${connectorType ? ` (${connectorType})` : ""}`
@@ -24,28 +33,35 @@ export function Header({ active, connectorType, apiUrl, online }: HeaderProps) {
 
 	return (
 		<Box
-			borderStyle="round"
+			borderStyle="double"
 			borderColor="cyan"
-			paddingX={1}
+			paddingX={2}
+			paddingY={0}
 			flexShrink={0}
-			flexDirection="row"
-			justifyContent="space-between"
+			flexDirection="column"
 		>
-			<Box>
-				<Text bold color="cyan">
-					easysql
-				</Text>
-				<Text dimColor> v{VERSION}</Text>
-				<Text>  ─  connector: </Text>
-				<Text color={active ? "green" : "yellow"} bold={!active}>
-					{connectorLabel}
-				</Text>
+			<Box flexDirection="row" justifyContent="space-between">
+				<Box>
+					<Text bold color="cyan">
+						easysql
+					</Text>
+					<Text dimColor> v{VERSION}</Text>
+					<Text>  ─  ask your database in natural language</Text>
+				</Box>
+				<Box>
+					<Text>
+						connector:{" "}
+						<Text color={active ? "green" : "yellow"} bold={!active}>
+							{connectorLabel}
+						</Text>
+					</Text>
+				</Box>
 			</Box>
-			<Box>
+			<Box flexDirection="row" justifyContent="flex-end">
 				{apiUrl && (
 					<Text dimColor>
 						{apiUrl.replace(/^https?:\/\//, "")}
-						{"  "}
+						{"   "}
 					</Text>
 				)}
 				<Text color={online ? "green" : "red"}>

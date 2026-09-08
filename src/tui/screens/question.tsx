@@ -272,13 +272,25 @@ export function QuestionScreen({
 		}
 	}
 
+	const showWelcome = status === "idle" && !result && !sql && buf.length === 0;
+
 	return (
 		<Box paddingX={1} flexDirection="column" flexGrow={1}>
-			<Text bold>Ask a question</Text>
 			<Box borderStyle="round" borderColor="green" paddingX={1}>
 				<Text color="green">›</Text>
-				<Text> {buf.length === 0 ? <Text dimColor>(type, hit Enter · / for commands)</Text> : buf}</Text>
+				<Text> {buf.length === 0 ? <Text dimColor>(type a question, hit Enter · / for commands)</Text> : buf}</Text>
 			</Box>
+
+			{showWelcome && (
+				<Box marginTop={1} flexDirection="column">
+					<Text dimColor>Try one of these:</Text>
+					<Text color="cyan">  • Top 10 customers by revenue</Text>
+					<Text color="cyan">  • How many orders were placed last week?</Text>
+					<Text color="cyan">  • List products with stock below 50</Text>
+					<Text> </Text>
+					<Text dimColor>Or type /help for commands, /quit to exit.</Text>
+				</Box>
+			)}
 
 			{slashBuf !== null && (
 				<Box marginTop={1} flexDirection="column">

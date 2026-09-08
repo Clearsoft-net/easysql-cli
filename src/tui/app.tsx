@@ -21,7 +21,7 @@
  * stays in `src/db/`, `src/sdk/`, `src/config/` — this file is pure UI.
  */
 
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useWindowSize } from "ink";
 import { useState } from "react";
 import {
 	findConnectorByName,
@@ -52,6 +52,15 @@ interface AppProps {
 
 export function App({ initialConnector }: AppProps) {
 	const { exit } = useApp();
+	// Pin the frame to the real terminal height. Ink's height="100%" on the
+	// root resolves to the content's natural height (the root's own height is
+	// auto), so a short frame would float at the bottom of a tall terminal
+	// whenever the alternate-screen buffer is unavailable (some terminals and
+	// multiplexers ignore the 1049h escape and fall back to log-update).
+	// Using the measured `rows` here guarantees a full-height layout —
+	// header at top, footer at bottom, content area filling the middle —
+	// regardless of alternate-screen support, and it tracks live resizes.
+	const { rows, columns } = useWindowSize();
 	const [screen, setScreen] = useState<ScreenName>("question");
 	const [helpOpen, setHelpOpen] = useState(false);
 	// While the Question screen is mid-query, suppress the Tab cycle
@@ -106,7 +115,7 @@ export function App({ initialConnector }: AppProps) {
 	const apiUrl = cfg.api_url || undefined;
 
 	return (
-		<Box flexDirection="column" height="100%">
+		<Box flexDirection="column" height={rows}>
 			<Header
 				active={active}
 				connectorType={activeConnector?.type}
@@ -148,6 +157,8 @@ export function App({ initialConnector }: AppProps) {
 			{helpOpen && (
 				<Box
 					position="absolute"
+					top={Math.max(1, Math.floor(rows / 2) - 8)}
+					left={Math.floor(columns / 4)}
 					borderStyle="double"
 					borderColor="yellow"
 					paddingX={2}

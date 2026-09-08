@@ -16,5 +16,13 @@ export function mountTui(opts: MountOptions) {
 		exitOnCtrlC: true,
 		patchConsole: true,
 		alternateScreen: true,
+		// Force interactive mode. Ink's auto-detection disables it
+		// whenever the CI env var is set (even on a real TTY), which
+		// silently kills alternateScreen and frame rendering — the
+		// visible symptom was the TUI painting nothing while running
+		// and leaving a huge black gap above its final frame. startRepl
+		// already gates on isatty(), so interactive is always correct
+		// here.
+		interactive: true,
 	});
 }

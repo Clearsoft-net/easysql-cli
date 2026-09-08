@@ -190,7 +190,7 @@ Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CO
 - `easysql` (sem subcomando) abre um shell interativo com React/ink (`src/tui/`).
 - 4 telas: **Connectors**, **History**, **Question**, **Help** modal.
 - Chrome (`src/tui/chrome.tsx`): **Header** com nome + versão + conector + URL da API + status online/offline; **TabBar** com `◀` / `▸` / `▶` setas sinalizando a posição e a tela ativa destacada em negrito; **Footer** com hints contextuais da tela atual e globais.
-- Renderiza em **alternate screen buffer** (vim/htop-style: ocupa o terminal e restaura o scrollback ao sair).
+- Renderiza em **alternate screen buffer** (vim/htop-style: ocupa o terminal e restaura o scrollback ao sair). `mountTui` força `interactive: true` no `render()` do ink — a auto-detecção dele desativa TUDO se a env var `CI` existir no shell do usuário (mesmo em TTY real), o que fazia a TUI não desenhar nada e deixar um buraco preto acima do último frame. O gate de `isatty()` em `repl.ts` já garante que só rodamos em TTY.
 - **Modelo de atalhos:** `Tab` / `Shift-Tab` ciclam entre Connectors → History → Question (única tecla de navegação global). Ações que começam com `/`: digitando `/` no input da Question screen abre um mini slash-prompt que aceita `/help`, `/quit`, `/connectors`, `/history`, `/question`, `/clear`. Caracteres comuns (`1`, `2`, `3`, `q`, `?`) passam direto pro buffer — `"qual o cliente tem 3 anos?"` não é interrompido.
 - O **Question** screen usa `useInput` local pra montar o buffer de texto e chama o mesmo pipeline de domínio (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — não duplica lógica.
 - Keybindings:

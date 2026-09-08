@@ -17,12 +17,13 @@ CLI em TypeScript/Bun que faz: login, gerencia conectores locais MySQL/Postgres/
 - **Drivers DB:** `mysql2 ^3.11` + `pg ^8.13` + SQLite via `bun:sqlite` (built-in)
 - **Output:** `chalk 5` (auto-detect TTY), renderer de tabela próprio
 - **Lint/format:** Biome 2.5 (`biome.json`, tabs, 100 col, LF, double quotes)
-- **Testes:** `bun test` (86 specs após EZSQL-45, sem dependência de vitest)
+- **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` em dev) — `easysql` sem subcomando abre React no terminal
+- **Testes:** `bun test` (90 specs após EZSQL-46, sem dependência de vitest)
 - **Build:**
   - `bun run build` → `tsc -p scripts/tsconfig.json` → `dist/`
   - `bun run build:compile` → `bun build --compile --minify` → `bin/easysql` (standalone ~92 MB)
 
-## Comandos (entregue: 12/12 ACs — 11 EZSQL-38 + 1 EZSQL-45)
+## Comandos (entregue: 12/12 ACs EZSQL-38/45 + TUI EZSQL-46)
 
 | Comando | Faz |
 |---|---|
@@ -90,7 +91,14 @@ src/
 ├── history/
 │   └── store.ts                # appendHistory/readHistory/clearHistory (jsonl, 0600)
 ├── tui/
-│   └── repl.ts                 # startRepl() — readline-based, comandos /connectors /use /history /help
+│   ├── app.tsx                 # ink Router — header + key bar + screen + help modal
+│   ├── mount.tsx               # wrapper JSX que chama ink render(<App />)
+│   ├── repl.ts                 # startRepl() — verifica TTY e delega ao mount
+│   └── screens/
+│       ├── connectors.tsx      # lista + j/k + Enter ativa
+│       ├── history.tsx         # lista paginada de HistoryEntry
+│       ├── question.tsx        # input + generate SQL + execute + render tabela
+│       └── help.tsx            # modal de keybindings
 ├── update/
 │   └── self-update.ts          # fetchLatestRelease/findAsset/atomicReplace/selfUpdate
 └── util/
@@ -176,6 +184,18 @@ Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CO
 - `--no-register`: só escreve o arquivo, pula API + `connectors-store` (útil para smoke tests).
 - TUI empty-state (`src/tui/repl.ts:105`) sugere `easysql demo` como on-ramp.
 
+## TUI (ink-based)
+
+- `easysql` (sem subcomando) abre um shell interativo com React/ink (`src/tui/`).
+- 4 telas: **Connectors** (`1`), **History** (`2`), **Question** (`3`), **Help** modal (`?`). `q` sai, `Ctrl-C` força.
+- O **Question** screen usa `useInput` local pra montar o buffer de texto e chama o mesmo pipeline de domínio (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — não duplica lógica.
+- Keybindings:
+  - Connectors: `j/k` ou `↑/↓` navegam, `Enter` ativa
+  - History: `h/l` ou `←/→` paginam
+  - Question: digita a pergunta, `Enter` envia, `Backspace` apaga
+- Tests em `tests/tui.test.tsx` usam `ink-testing-library` (PassThrough stdin).
+- Sem TTY: `repl.ts` rejeita com mensagem instruindo `easysql query "..."`.
+
 ## Onde mexer para cada coisa
 
 | Tarefa | Arquivo(s) |
@@ -193,7 +213,7 @@ Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CO
 ```bash
 bun install --frozen-lockfile   # lockfile é obrigatório no CI
 bun run check                   # biome + tsc --noEmit (lint+typecheck)
-bun test                        # 86 specs (sqlite + demo inclusos)
+bun test                        # 90 specs (sqlite + demo + TUI inclusos)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
 ./bin/easysql --help            # smoke
@@ -203,7 +223,7 @@ make build-compile              # bun --compile → bin/easysql
 
 ## Estado atual
 
-- 86/86 testes passando (`bun test`).
+- 90/90 testes passando (`bun test`).
 - `bun run check` limpo (warnings menores de `noExplicitAny` em SDK wrapper e 1 `useImportType` — não bloqueiam).
 - Binário standalone `bin/easysql` já construído (~92 MB).
 - `bin/` e `dist/` estão no `.gitignore` — não comitar.

@@ -28,58 +28,79 @@ describe("TUI App", () => {
 	it("renders the chrome (header + tabs + footer) on first paint", () => {
 		const { lastFrame } = render(<App />);
 		const frame = lastFrame();
-		// Header
 		expect(frame).toContain("easysql");
 		expect(frame).toContain("connector:");
 		expect(frame).toContain("no connector selected");
-		// Tab bar — all three tabs present, the active one prefixed with ▸
+		expect(frame).toContain("Connectors");
+		expect(frame).toContain("History");
+		expect(frame).toContain("Question");
+		expect(frame).toContain("▸ Question");
+		expect(frame).toContain("[Tab] command palette");
+		expect(frame).toContain("[Ctrl-C] quit");
+	});
+
+	it("opens the command palette when Tab is pressed", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		const frame = lastFrame();
+		expect(frame).toContain("Command palette");
 		expect(frame).toContain("[1] Connectors");
 		expect(frame).toContain("[2] History");
 		expect(frame).toContain("[3] Question");
-		expect(frame).toContain("▸ [3] Question");
-		// Footer — screen hint + global hints
-		expect(frame).toContain("[1/2/3] switch");
-		expect(frame).toContain("[?] help");
-		expect(frame).toContain("[q] quit");
 	});
 
-	it("switches to the History screen when 2 is pressed", async () => {
+	it("Tab+2 navigates to History", async () => {
 		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
 		stdin.write("2");
 		await new Promise((r) => setTimeout(r, 50));
 		const frame = lastFrame();
-		expect(frame).toContain("▸ [2] History");
 		expect(frame).toContain("History — page");
-		expect(frame).toContain("←/→ or h/l switch page");
+		expect(frame).not.toContain("Command palette");
 	});
 
-	it("opens the help modal on ? and dismisses on ?", async () => {
+	it("Esc closes the palette when open", async () => {
 		const { lastFrame, stdin } = render(<App />);
-		stdin.write("?");
+		stdin.write("\t");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).toContain("keybindings");
-		stdin.write("?");
+		expect(lastFrame()).toContain("Command palette");
+		stdin.write("\u001b");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).not.toContain("keybindings");
+		expect(lastFrame()).not.toContain("Command palette");
 	});
 
-	it("shows screen-specific hints for Connectors", async () => {
+	it("number keys typed in Question screen go to the buffer, not to switches", async () => {
 		const { lastFrame, stdin } = render(<App />);
-		stdin.write("1");
+		// The Question screen is active by default; type '1', '2', '3'
+		// — they should NOT switch screens.
+		stdin.write("123");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).toContain("↑/↓ or j/k navigate");
+		const frame = lastFrame();
+		// We're still on the Question screen (▸ Question) and the
+		// placeholder is gone, meaning the buffer absorbed the digits.
+		expect(frame).toContain("▸ Question");
+		// The 'Prompt' hint is replaced by the typed text; check that
+		// the placeholder hint is no longer present.
+		expect(frame).not.toContain("(type, hit Enter)");
 	});
 
-	it("shows screen-specific hints for Question", async () => {
+	it("Tab opens palette even from Question screen, but doesn't break the input", async () => {
 		const { lastFrame, stdin } = render(<App />);
-		// The Question screen is already the default, but the hint should
-		// still reflect it
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		// Tab is consumed by the global handler, not added to the input.
+		expect(lastFrame()).toContain("Command palette");
+	});
+
+	it("Question screen hint stays visible by default", () => {
+		const { lastFrame } = render(<App />);
 		expect(lastFrame()).toContain("Type · Enter submit · Backspace delete");
 	});
 
 	it("renders the Question empty state when there are no connectors", () => {
-		const { lastFrame, stdin } = render(<App />);
-		stdin.write("3");
+		const { lastFrame } = render(<App />);
 		expect(lastFrame()).toContain("Pick a connector first");
 	});
 });

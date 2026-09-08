@@ -8,7 +8,7 @@
  */
 
 import { Box, Text, useInput } from "ink";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	findConnectorByName,
 	upsertConnector,
@@ -23,6 +23,7 @@ type Status = "idle" | "generating" | "executing" | "ok" | "error";
 
 interface Props {
 	connector: string;
+	onBusyChange?: (busy: boolean) => void;
 }
 
 interface QueryResponse {
@@ -40,13 +41,17 @@ async function readPasswordInteractive(): Promise<string> {
 	return secret;
 }
 
-export function QuestionScreen({ connector }: Props) {
+export function QuestionScreen({ connector, onBusyChange }: Props) {
 	const [buf, setBuf] = useState("");
 	const [status, setStatus] = useState<Status>("idle");
 	const [sql, setSql] = useState<string | null>(null);
 	const [result, setResult] = useState<LocalQueryResult | null>(null);
 	const [err, setErr] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+
+	useEffect(() => {
+		onBusyChange?.(busy);
+	}, [busy, onBusyChange]);
 
 	useInput((input, key) => {
 		if (busy) return;
@@ -60,8 +65,10 @@ export function QuestionScreen({ connector }: Props) {
 			setBuf((s) => s.slice(0, -1));
 			return;
 		}
-		if (key.ctrl || key.meta) return;
-		if (input && !key.escape) {
+		// Reserve Tab / Esc / Ctrl for global shortcuts (palette, modal,
+		// quit) — they are consumed by the App-level handler.
+		if (key.tab || key.escape || key.ctrl || key.meta) return;
+		if (input) {
 			setBuf((s) => s + input);
 		}
 	});

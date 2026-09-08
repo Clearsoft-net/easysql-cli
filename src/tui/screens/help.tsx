@@ -13,22 +13,28 @@ export function HelpScreen() {
 			</Text>
 			<Text> </Text>
 			<Text>
-				<Text color="cyan">[1]</Text> Connectors screen — list, navigate (j/k), activate (Enter)
-			</Text>
-			<Text>
-				<Text color="cyan">[2]</Text> History screen — paginated local question log
-			</Text>
-			<Text>
-				<Text color="cyan">[3]</Text> Question screen — type NL question, Enter to run
+				<Text color="cyan">[Tab]</Text> Open command palette (1/2/3/?/q)
 			</Text>
 			<Text>
 				<Text color="cyan">[?]</Text> Toggle this help overlay
 			</Text>
 			<Text>
-				<Text color="cyan">[q]</Text> Quit
+				<Text color="cyan">[Esc]</Text> Close palette/help
 			</Text>
 			<Text>
-				<Text color="cyan">[Ctrl-C]</Text> Force quit
+				<Text color="cyan">[Ctrl-C]</Text> Quit
+			</Text>
+			<Text> </Text>
+			<Text dimColor>Inside the Question screen:</Text>
+			<Text>
+				<Text color="cyan">[Enter]</Text> Submit the question
+			</Text>
+			<Text>
+				<Text color="cyan">[Backspace]</Text> Delete a character
+			</Text>
+			<Text>
+				<Text color="cyan">[1/2/3/?/q]</Text> Pass through to your input — they're
+				letters now, not shortcuts.
 			</Text>
 			<Text> </Text>
 			<Text dimColor>Press ? or Esc to close.</Text>

@@ -1,90 +1,93 @@
 # AGENTS.md
 
-Contexto operacional do **easysql-cli** — CLI/TUI open-source para a plataforma EasySQL. Lê em 2 minutos para começar.
+Operational context for **easysql-cli** — the open-source CLI/TUI for the EasySQL platform. Two-minute read to get started.
 
-## O que é
+## What it is
 
-CLI em TypeScript/Bun que faz: login, gerencia conectores locais MySQL/Postgres/SQLite (schema-only), executa queries em linguagem natural via EasySQL API, valida que o SQL gerado é SELECT-only, executa localmente e mostra resultados em tabela. Inclui TUI interativa, self-update via GitHub Releases e um `easysql demo` que gera uma base SQLite de exemplo para experimentação imediata.
+A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connectors (schema-only), runs natural-language queries through the EasySQL API, validates that the generated SQL is SELECT-only, executes it locally, and prints the results as a table. It ships an interactive TUI, self-update via GitHub Releases, and an `easysql demo` command that generates a sample SQLite database for instant experimentation.
 
-**Princípio central:** credenciais de banco NUNCA saem do host. Só metadata de schema é enviada à API.
+**Core principle:** database credentials NEVER leave the host. Only schema metadata is sent to the API.
 
 ## Stack
 
-- **Linguagem:** TypeScript 5.7 (strict, `noUncheckedIndexedAccess`)
+- **Language:** TypeScript 5.7 (strict, `noUncheckedIndexedAccess`)
 - **Runtime:** Bun 1.3+ (engines: `bun >=1.1.0`, `node >=20`)
-- **CLI framework:** commander 12 + manual help manual em `src/i18n/help.ts`
-- **HTTP SDK:** `@clearsoft/easysql-sdk` (cliente openapi-fetch)
-- **Drivers DB:** `mysql2 ^3.11` + `pg ^8.13` + SQLite via `bun:sqlite` (built-in)
-- **Output:** `chalk 5` (auto-detect TTY), renderer de tabela próprio
+- **CLI framework:** commander 12 + a hand-written help manual in `src/i18n/help.ts`
+- **HTTP SDK:** `@clearsoft/easysql-sdk` (openapi-fetch client)
+- **DB drivers:** `mysql2 ^3.11` + `pg ^8.13` + SQLite via `bun:sqlite` (built-in)
+- **Output:** `chalk 5` (auto-detect TTY), custom table renderer
 - **Lint/format:** Biome 2.5 (`biome.json`, tabs, 100 col, LF, double quotes)
-- **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` em dev) — `easysql` sem subcomando abre React no terminal
-- **Testes:** `bun test` (90 specs após EZSQL-46, sem dependência de vitest)
+- **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` in dev) — running `easysql` with no subcommand opens React in the terminal
+- **Tests:** `bun test` (117 specs, no vitest dependency)
 - **Build:**
   - `bun run build` → `tsc -p scripts/tsconfig.json` → `dist/`
   - `bun run build:compile` → `bun build --compile --minify` → `bin/easysql` (standalone ~92 MB)
 
-## Comandos (entregue: 12/12 ACs EZSQL-38/45 + TUI EZSQL-46)
+## Commands (delivered: 12/12 ACs EZSQL-38/45 + TUI EZSQL-46)
 
-| Comando | Faz |
+| Command | What it does |
 |---|---|
-| `easysql login` | Autentica com API key (`--api-key` / `$EASYSQL_API_KEY` / `--non-interactive`, -y) |
-| `easysql logout` | Limpa credenciais locais |
-| `easysql demo` | Gera base SQLite local de exemplo e registra como `local-demo` |
-| `easysql connector add` | Introspecta DB local, envia só schema à API (mysql/mariadb/postgresql/sqlite) |
-| `easysql connector sync` | Re-extrai schema (atualmente: refazer `add` com mesmo nome) |
-| `easysql connector list` | Lista conectores conhecidos pela API |
-| `easysql query "<q>"` | Gera SQL e executa localmente (SELECT-only) |
-| `easysql query "<q>" --generate-only` | Imprime SQL sem executar |
-| `easysql usage` | Consumo de quota (chama `/v1/dashboard/stats`) |
-| `easysql history` | Log local read-only (`history.jsonl`) |
+| `easysql login` | Authenticates with an API key (`--api-key` / `$EASYSQL_API_KEY` / `--non-interactive`, -y) |
+| `easysql logout` | Clears local credentials |
+| `easysql demo` | Generates a local sample SQLite database and registers it as `local-demo` |
+| `easysql connector add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/sqlite) |
+| `easysql connector sync [name]` | Re-introspects and re-sends the schema (`syncConnector`); with no name, uses the single local connector |
+| `easysql connector list` | Lists connectors known to the API |
+| `easysql connector remove <name>` | Removes the connector server-side (best-effort) and locally (`--yes` skips confirmation) |
+| `easysql query "<q>"` | Generates SQL and executes it locally (SELECT-only) |
+| `easysql query "<q>" --generate-only` | Prints the SQL without executing |
+| `easysql usage` | Quota consumption (calls `/v1/dashboard/stats`) |
+| `easysql history` | Local read-only log (`history.jsonl`) |
 | `easysql update [--check]` | Self-update via GitHub Releases |
-| `easysql` (sem subcomando) | Abre REPL TUI interativo |
+| `easysql` (no subcommand) | Opens the interactive TUI REPL |
 
 **Global flags:** `--api-url`, `--config`, `--json`, `--no-color`, `-v`, `-h`.
 
-## Estrutura
+## Structure
 
 ```
 src/
-├── bin.ts                      # entrypoint do binário (slice argv do bun compile)
-├── cli.ts                      # run(argv) — único lugar com try/catch global
-├── index.ts                    # entrypoint público (re-exports para testes)
-├── version.ts                  # VERSION/NAME/REPO (lidos de package.json)
+├── bin.ts                      # binary entrypoint (slices argv from bun compile)
+├── cli.ts                      # run(argv) — the only place with a global try/catch
+├── index.ts                    # public entrypoint (re-exports for tests)
+├── version.ts                  # VERSION/NAME/REPO (read from package.json)
 ├── cli/
-│   ├── program.ts              # buildProgram() — registra subcomandos
+│   ├── program.ts              # buildProgram() — registers subcommands
 │   ├── global-options.ts       # GlobalOptions type + DEFAULT_API_URL
+│   ├── user-args.ts            # userArgs(argv) — strip runtime/script prefix
 │   └── errors.ts               # CliError + NotLoggedInError/NetworkError/ApiError
 ├── commands/
 │   ├── login.ts                # registerLogin(program)
 │   ├── logout.ts
-│   ├── demo.ts                 # easysql demo — gera SQLite local de exemplo
-│   ├── connector.ts            # grupo add|sync|list (mysql/mariadb/postgresql/sqlite)
+│   ├── demo.ts                 # easysql demo — generates a sample local SQLite DB
+│   ├── connector.ts            # add|sync|remove|list group (mysql/mariadb/postgresql/sqlite)
 │   ├── query.ts                # registerQuery
 │   ├── usage.ts
 │   ├── history.ts
 │   ├── update.ts
 │   ├── help.ts                 # easysql help [command] — manual
-│   └── stubs.ts                # vazio (placeholder legado)
+│   └── stubs.ts                # empty (legacy placeholder)
 ├── config/
 │   ├── paths.ts                # XDG-aware: getConfigDir/getConfigPath/getDataDir/getHistoryPath
 │   ├── store.ts                # loadConfig/saveConfig/clearConfig/isLoggedIn (0600)
-│   └── connectors-store.ts     # CRUD dos conectores locais (0600, sem password)
+│   └── connectors-store.ts     # CRUD for local connectors (0600, no password)
 ├── db/
-│   ├── schema.ts               # tipos ColumnSchema/TableSchema/ConnectorSchema + DatabaseType
-│   ├── introspect.ts           # dispatcher mysql/mariadb/postgresql/sqlite
+│   ├── schema.ts               # ColumnSchema/TableSchema/ConnectorSchema types + DatabaseType
+│   ├── introspect.ts           # mysql/mariadb/postgresql/sqlite dispatcher
 │   ├── introspect-mysql.ts     # mysql2 + information_schema
 │   ├── introspect-postgres.ts  # pg + pg_catalog
 │   ├── introspect-sqlite.ts    # bun:sqlite + sqlite_master + PRAGMA
 │   ├── demo.ts                 # buildDemoDatabase() — sample customers/products/orders
-│   ├── parse-url.ts            # parseConnectionUrl() + mergeConnection() (sqlite:/// aceito)
-│   └── execute.ts              # executeSelect() com validateSelectOnly() antes
+│   ├── parse-url.ts            # parseConnectionUrl() + mergeConnection() (sqlite:/// accepted)
+│   ├── sync-connector.ts       # syncLocalConnector() — re-introspect + POST /sync
+│   └── execute.ts              # executeSelect() with validateSelectOnly() first
 ├── sdk/
-│   └── client.ts               # wrapper do @clearsoft/easysql-sdk + resolveApiUrl()
+│   └── client.ts               # @clearsoft/easysql-sdk wrapper + resolveApiUrl()
 ├── types/
-│   └── bun-sqlite.d.ts         # ambient declarations para bun:sqlite (sem @types/bun)
+│   └── bun-sqlite.d.ts         # ambient declarations for bun:sqlite (without @types/bun)
 ├── i18n/
-│   ├── messages.ts             # strings de UI (errors/prompts/success/info)
-│   └── help.ts                 # manual help (HELP_TOP/HELP_COMMANDS/HELP_DEMO/...)
+│   ├── messages.ts             # UI strings (errors/prompts/success/info)
+│   └── help.ts                 # help manual (HELP_TOP/HELP_COMMANDS/HELP_DEMO/...)
 ├── output/
 │   ├── print.ts                # print/printError/printSuccess/printInfo (JSON-aware)
 │   └── table.ts                # renderResult(format, cols, rows): table|json|csv
@@ -92,146 +95,161 @@ src/
 │   └── store.ts                # appendHistory/readHistory/clearHistory (jsonl, 0600)
 ├── tui/
 │   ├── app.tsx                 # ink Router — chrome + screen slot + help modal
-│   ├── chrome.tsx              # Header / TabBar / Footer estáticos
-│   ├── mount.tsx               # wrapper JSX que chama ink render(<App />, alternateScreen)
-│   ├── repl.ts                 # startRepl() — verifica TTY e delega ao mount
+│   ├── chrome.tsx              # static Header / TabBar / Footer
+│   ├── cursor.tsx              # text cursor for input fields
+│   ├── spinner.tsx             # Spinner (braille) for in-flight states
+│   ├── result-table.tsx        # ResultTable — table rendered in ink (aligned)
+│   ├── sql-highlight.tsx       # SqlText — keyword/string/number highlighting
+│   ├── mount.tsx               # JSX wrapper that calls ink render(<App />, alternateScreen)
+│   ├── repl.ts                 # startRepl() — checks TTY and delegates to mount
 │   └── screens/
-│       ├── connectors.tsx      # lista + j/k + Enter ativa
-│       ├── history.tsx         # lista paginada de HistoryEntry
-│       ├── question.tsx        # input + generate SQL + execute + render tabela
-│       └── help.tsx            # modal de keybindings
+│       ├── connectors.tsx      # list + add/remove/sync + j/k + Enter to activate
+│       ├── connector-sync.tsx  # <ConnectorSync> — introspect + POST /sync (inline password)
+│       ├── usage.tsx           # <UsageView> — /usage (dashboard/stats)
+│       ├── history.tsx         # paginated list of HistoryEntry
+│       ├── question.tsx        # input + generate SQL + execute + table + /commands
+│       └── help.tsx            # keybindings modal
 ├── update/
 │   └── self-update.ts          # fetchLatestRelease/findAsset/atomicReplace/selfUpdate
 └── util/
     ├── prompt.ts               # promptSecret/promptLine/promptLineDefault (raw mode + TTY-aware)
-    └── sql-validator.ts        # validateSelectOnly() — defesa em profundidade
+    └── sql-validator.ts        # validateSelectOnly() — defense in depth
 scripts/
-├── build.ts                    # tsc OU bun --compile
-├── release-binaries.ts         # builda linux/darwin/windows x x64/arm64 → bin/easysql-*
+├── build.ts                    # tsc OR bun --compile
+├── release-binaries.ts         # builds linux/darwin/windows x x64/arm64 → bin/easysql-*
+├── tui-capture.ts              # dev: renders the TUI in a PTY (tmux) + --png screenshot
 └── tsconfig.json               # extends ../tsconfig.json, outDir=../dist
-tests/                          # bun:test — 1 arquivo por módulo + _helpers.ts
+tests/                          # bun:test — one file per module + _helpers.ts
 .github/workflows/
-├── ci.yml                      # push/PR em main → lint+typecheck+test+build+smoke
-└── release.yml                 # tag v*.*.* → build binários + SHA256SUMS + release
+├── ci.yml                      # push/PR to main → lint+typecheck+test+build+smoke
+└── release.yml                 # tag v*.*.* → build binaries + SHA256SUMS + release
 ```
 
-## Segurança (não negociável)
+## Security (non-negotiable)
 
-- **Schema-only:** `introspectDatabase()` retorna só `{tables, columns, types, pks, fks, rows_approx}`.
-  Passwords, hosts e ports NUNCA cruzam o limite do processo.
-- **Password nunca persistido.** `$XDG_CONFIG_HOME/easysql/connectors.json` guarda só `name/type/host/port/user/database/ssl`. A senha é re-prompted (ou `$EASYSQL_DB_PASSWORD`) em toda execução de query.
-- **API key em `config.json` com `0600`.** chmod é best-effort no Windows.
-- **SQL validator local** (`src/util/sql-validator.ts`): tokenizer + regex, antes de tocar no DB local. Server-side já enforça, isto é defense-in-depth.
-- **Stacked statements rejeitados**, só um `;` terminal permitido, head precisa ser `WITH|SELECT|EXPLAIN|SHOW`.
-- **SQLite connectors não têm credenciais.** A única coisa que sai da máquina é o schema; o `file` path fica em `connectors.json` localmente (e nunca é enviado à API — só `{type: "sqlite", name, schema}`).
+- **Schema-only:** `introspectDatabase()` returns only `{tables, columns, types, pks, fks, rows_approx}`.
+  Passwords, hosts, and ports NEVER cross the process boundary.
+- **Password never persisted.** `$XDG_CONFIG_HOME/easysql/connectors.json` stores only `name/type/host/port/user/database/ssl`. The password is re-prompted (or read from `$EASYSQL_DB_PASSWORD`) on every query run.
+- **API key in `config.json` with `0600`.** chmod is best-effort on Windows.
+- **Local SQL validator** (`src/util/sql-validator.ts`): tokenizer + regex, applied before touching the local DB. The server side already enforces this; this is defense in depth.
+- **Stacked statements rejected**, only one trailing `;` allowed, the head must be `WITH|SELECT|EXPLAIN|SHOW`.
+- **SQLite connectors have no credentials.** The only thing leaving the machine is the schema; the `file` path stays in the local `connectors.json` (and is never sent to the API — only `{type: "sqlite", name, schema}`).
 
 ## Storage layout (XDG)
 
-| Arquivo | Conteúdo | Permissões |
+| File | Contents | Permissions |
 |---|---|---|
-| `~/.config/easysql/config.json` | `{api_url, api_key, last_login_at}` | 0600 |
-| `~/.config/easysql/connectors.json` | array `StoredConnector[]` (sem password) | 0600 |
-| `~/.local/share/easysql/history.jsonl` | uma entrada JSON por linha, append-only | 0600 |
-| Windows: `%APPDATA%\easysql\` + `%LOCALAPPDATA%\easysql\` | mesmo esquema, chmod é no-op | — |
+| `~/.config/easysql/config.json` | `{api_url, api_key, last_login_at, user_email?, user_name?, plan_name?}` | 0600 |
+| `~/.config/easysql/connectors.json` | array `StoredConnector[]` (no password) | 0600 |
+| `~/.local/share/easysql/history.jsonl` | one JSON entry per line, append-only | 0600 |
+| Windows: `%APPDATA%\easysql\` + `%LOCALAPPDATA%\easysql\` | same scheme, chmod is a no-op | — |
 
-Override via `--config <path>` (atua em `getConfigPath()`). Diretório: `$XDG_CONFIG_HOME` ou `~/.config`.
+Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CONFIG_HOME` or `~/.config`.
 
 ## Exit codes (`src/cli.ts:6-11`)
 
-- `0` sucesso
-- `1` erro genérico / commander parse
-- `2` não autenticado (`NotLoggedInError`)
-- `3` erro de rede (`NetworkError`)
-- `4` erro de API (`ApiError`)
-- `5` violação de safety (mutação rejeitada localmente)
+- `0` success
+- `1` generic error / commander parse
+- `2` not authenticated (`NotLoggedInError`)
+- `3` network error (`NetworkError`)
+- `4` API error (`ApiError`)
+- `5` safety violation (mutation rejected locally)
 
-## SDK — como a CLI consome a API
+## SDK — how the CLI consumes the API
 
-- `src/sdk/client.ts` é a única ponte para `@clearsoft/easysql-sdk`.
-- `resolveApiUrl()`: `--api-url` > `$EASYSQL_API_URL` > config salvo > `https://api.easysql.net`.
-- `getAuthenticatedClient(key, url)` retorna `AuthenticatedClient` (interface manual espelhando o SDK).
-- `getSavedClient()`: throws `NotLoggedInError` se sem config; usado por `query`/`usage`/`connector`/`history`.
-- `login` valida chamando `me()` antes de persistir; 401/403 → erro de chave inválida.
-- `createQuery` retorna `{id, sql_generated, needs_local_execution, status}`; `query.ts` lê `sql_generated`, executa localmente e depois chama `answerQuery` (POST `/v1/queries/:id/answer`) com `result_data: result.rows` para a API gerar answer+chart.
-- `syncConnector` (a partir do SDK 1.1.0) passou a exigir body `{schema: TableSchema[]}`; `connector.ts:282` ainda rejeita `--id` com erro explícito — quando for implementar sync-by-name, esse é o lugar.
+- `src/sdk/client.ts` is the only bridge to `@clearsoft/easysql-sdk`.
+- `resolveApiUrl()`: `--api-url` > `$EASYSQL_API_URL` > saved config > `https://api.easysql.net`.
+- `getAuthenticatedClient(key, url)` returns an `AuthenticatedClient` (a hand-written interface mirroring the SDK).
+- `getSavedClient()`: throws `NotLoggedInError` if there is no config; used by `query`/`usage`/`connector`/`history`.
+- `login` validates by calling `me()` before persisting; 401/403 → invalid-key error.
+- `createQuery` returns `{id, sql_generated, needs_local_execution, status}`; `query.ts` reads `sql_generated`, executes locally, then calls `answerQuery` (POST `/v1/queries/:id/answer`) with `result_data: result.rows` so the API can generate the answer+chart.
+- `syncConnector` (as of SDK 1.1.0) now requires a `{schema: TableSchema[]}` body; `connector.ts:282` still rejects `--id` with an explicit error — that is the place to change when implementing sync-by-name.
 
 ## Self-update
 
 - Feed: `https://api.github.com/repos/Clearsoft-net/easysql-cli/releases/latest`
 - Asset naming: `easysql-<platform>-<arch>` (linux/darwin x x64/arm64 + windows-x64)
-- `currentPlatform()` resolve de `node:os` (arch = `arm64` ou `x64`)
-- `atomicReplace()` usa `renameSync` (POSIX atomic se mesmo FS) — `bin/<exe>.easysql-update.tmp` é escrito antes
-- Versão atual vem de `package.json` (via `src/version.ts`), com import `with { type: "json" }`
+- `currentPlatform()` resolves from `node:os` (arch = `arm64` or `x64`)
+- `atomicReplace()` uses `renameSync` (POSIX atomic on the same FS) — `bin/<exe>.easysql-update.tmp` is written first
+- The current version comes from `package.json` (via `src/version.ts`), with an import `with { type: "json" }`
 
 ## Build & release pipeline
 
 - **CI** (`.github/workflows/ci.yml`): `bun install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build` → `build:compile` → `./bin/easysql --version` smoke.
-- **Release** (`.github/workflows/release.yml`): em push de tag `v*.*.*` ou manual dispatch → `check` + `test` + `scripts/release-binaries.ts` → `sha256sum bin/easysql-* > SHA256SUMS` → `softprops/action-gh-release@v2` publica os 5 binários + SHA256SUMS.
+- **Release** (`.github/workflows/release.yml`): on a `v*.*.*` tag push or manual dispatch → `check` + `test` + `scripts/release-binaries.ts` → `sha256sum bin/easysql-* > SHA256SUMS` → `softprops/action-gh-release@v2` publishes the 5 binaries + SHA256SUMS.
 
-## Convenções de código
+## npm packaging
+
+- The npm package ships **only `dist/`** (`package.json` `files`). The standalone binaries live on GitHub Releases, not in the npm tarball — a ~96 MB executable in the tarball would bloat installs and trip antivirus heuristics.
+- `prepublishOnly` runs `bun run build`, so `dist/` is always fresh at publish time.
+- The package is **Bun-only**: it imports `bun:sqlite` and the `bin` shebang is `#!/usr/bin/env bun`. `bunx` / `bun add -g` work; `npx` / `npm i -g` only work if Bun is on `PATH`.
+
+## Code conventions
 
 - **Tabs** (4-wide), double quotes, trailing commas, LF, 100 col (Biome).
-- **Sem comentários óbvios.** Os existentes explicam "porquê" (estratégia de introspecção, defesa em profundidade, naming de assets). Não adicionar comments redundantes.
-- **Sem emojis** a menos que o usuário peça.
-- **Não commitar secrets.** `.gitignore` já cobre `.env`, `dist/`, `bin/`, `node_modules/`.
-- Cada comando exporta `registerXxx(program: Command): void`. Nenhuma lógica de wiring dentro de `program.ts` além de `register*` + `preAction` para flags globais.
-- `printError/printSuccess/printInfo` (`src/output/print.ts`) respeitam `--json` e `--no-color`. Mensagens user-facing vêm de `src/i18n/messages.ts` via `t().…`. Manual/help vem de `src/i18n/help.ts`.
+- **No obvious comments.** The existing ones explain "why" (introspection strategy, defense in depth, asset naming). Do not add redundant comments.
+- **No emojis** unless the user asks.
+- **Never commit secrets.** `.gitignore` already covers `.env`, `dist/`, `bin/`, `node_modules/`.
+- Each command exports `registerXxx(program: Command): void`. No wiring logic inside `program.ts` beyond `register*` + `preAction` for global flags.
+- `printError/printSuccess/printInfo` (`src/output/print.ts`) honor `--json` and `--no-color`. User-facing messages come from `src/i18n/messages.ts` via `t().…`. Manual/help comes from `src/i18n/help.ts`.
 
-## `easysql demo` — banco de demonstração local
+## `easysql demo` — local demo database
 
-- Comando: `src/commands/demo.ts` + gerador puro em `src/db/demo.ts`.
-- Cria `$XDG_DATA_HOME/easysql/demo.db` (ou `%LOCALAPPDATA%/easysql/demo.db`) com 4 tabelas determinísticas (`customers`, `products`, `orders`, `order_items`). Re-rodar sobrescreve (idempotente).
-- Registra como conector `local-demo` (idempotente via `upsertConnector`). O caminho do `.db` fica no `connectors.json` local, nunca na API.
-- `--no-register`: só escreve o arquivo, pula API + `connectors-store` (útil para smoke tests).
-- TUI empty-state (`src/tui/repl.ts:105`) sugere `easysql demo` como on-ramp.
+- Command: `src/commands/demo.ts` + a pure generator in `src/db/demo.ts`.
+- Creates `$XDG_DATA_HOME/easysql/demo.db` (or `%LOCALAPPDATA%/easysql/demo.db`) with 4 deterministic tables (`customers`, `products`, `orders`, `order_items`). Re-running overwrites (idempotent).
+- Registers it as the `local-demo` connector (idempotent via `upsertConnector`). The `.db` path stays in the local `connectors.json`, never on the API.
+- `--no-register`: only writes the file, skips the API + `connectors-store` (useful for smoke tests).
+- The TUI empty-state (`src/tui/repl.ts:105`) suggests `easysql demo` as the on-ramp.
 
 ## TUI (ink-based)
 
-- `easysql` (sem subcomando) abre um shell interativo com React/ink (`src/tui/`).
-- 4 telas: **Connectors**, **History**, **Question**, **Help** modal.
-- Chrome (`src/tui/chrome.tsx`): **Header** com nome + versão + conector + URL da API + status online/offline; **TabBar** com `◀` / `▸` / `▶` setas sinalizando a posição e a tela ativa destacada em negrito; **Footer** com hints contextuais da tela atual e globais.
-- Renderiza em **alternate screen buffer** (vim/htop-style: ocupa o terminal e restaura o scrollback ao sair). `mountTui` força `interactive: true` no `render()` do ink — a auto-detecção dele desativa TUDO se a env var `CI` existir no shell do usuário (mesmo em TTY real), o que fazia a TUI não desenhar nada e deixar um buraco preto acima do último frame. O gate de `isatty()` em `repl.ts` já garante que só rodamos em TTY.
-- **Modelo de atalhos:** `Tab` / `Shift-Tab` ciclam entre Connectors → History → Question (única tecla de navegação global). Ações que começam com `/`: digitando `/` no input da Question screen abre um mini slash-prompt que aceita `/help`, `/quit`, `/connectors`, `/history`, `/question`, `/clear`. Caracteres comuns (`1`, `2`, `3`, `q`, `?`) passam direto pro buffer — `"qual o cliente tem 3 anos?"` não é interrompido.
-- O **Question** screen usa `useInput` local pra montar o buffer de texto e chama o mesmo pipeline de domínio (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — não duplica lógica.
+- `easysql` (no subcommand) opens an interactive React/ink shell (`src/tui/`).
+- 4 screens: **Connectors**, **History**, **Question**, **Help** modal.
+- Chrome (`src/tui/chrome.tsx`): **Header** with brand + active user email (via `me()`, cached in `config.json`) + connector + plan + version + API URL + online/offline status; **TabBar** as a segmented control (active tab in a cyan pill); **Footer** with contextual hints for the current screen and globals.
+- **Active user:** `App` (`src/tui/app.tsx`) calls `client.me()` on mount, updates the header, and persists `user_email`/`user_name`/`plan_name` to config for offline rendering; login already writes those fields.
+- Renders in the **alternate screen buffer** (vim/htop-style: fills the terminal and restores scrollback on exit). `mountTui` forces `interactive: true` in ink's `render()` — its auto-detection disables EVERYTHING if the `CI` env var is present in the user's shell (even on a real TTY), which made the TUI draw nothing and leave a black hole above the last frame. The `isatty()` gate in `repl.ts` already guarantees we only run on a TTY.
+- **Shortcut model:** `Tab` / `Shift-Tab` cycle Connectors → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
+- The **Question** screen uses a local `useInput` to build the text buffer and calls the same domain pipeline (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — no duplicated logic.
 - Keybindings:
-  - Connectors: `j/k` ou `↑/↓` navegam, `Enter` ativa
-  - History: `h/l` ou `←/→` paginam
-  - Question: digita a pergunta, `Enter` envia, `Backspace` apaga
-  - Globais: `Tab` (próxima tela), `Shift-Tab` (anterior), `Ctrl-C` (quit), `Esc` (fecha overlay)
-  - Slash-prompt: `/help` `/quit` `/connectors` `/history` `/question` `/clear`
-- Tests em `tests/tui.test.tsx` usam `ink-testing-library` (PassThrough stdin).
-- Sem TTY: `repl.ts` rejeita com mensagem instruindo `easysql query "..."`.
+  - Connectors: `j/k` or `↑/↓` navigate; `Enter` activates the highlighted connector or opens the add form when the last row ("+ Add a connector…") is selected; `s` syncs the highlighted connector; `d`/Del removes (confirm with `y`/Enter). In the form: `↑/↓` field, `←/→` type/SSL, `Enter` saves, `Esc` cancels.
+  - Sync (Connectors `s` and Question `/sync`): `<ConnectorSync>` (`src/tui/screens/connector-sync.tsx`) re-introspects and calls `syncLocalConnector`; asks for an inline password for MySQL/Postgres (uses `$EASYSQL_DB_PASSWORD` if set), SQLite does not need one.
+  - History: `h/l` or `←/→` paginate
+  - Question: type the question, `Enter` submits, `Backspace` deletes; `/usage` shows plan/quota
+  - Globals: `Tab` (next screen), `Shift-Tab` (previous), `Ctrl-C` (quit), `Esc` (close overlay)
+  - Slash-prompt: filterable dropdown — `/help` `/quit` `/connectors` `/history` `/question` `/clear` `/sync` `/usage`
+- Tests in `tests/tui.test.tsx` use `ink-testing-library` (PassThrough stdin).
+- Without a TTY: `repl.ts` rejects with a message instructing `easysql query "..."`.
 
-## Onde mexer para cada coisa
+## Where to change things
 
-| Tarefa | Arquivo(s) |
+| Task | File(s) |
 |---|---|
-| Adicionar subcomando | `src/commands/<name>.ts` + registrar em `src/cli/program.ts` + entrada em `src/i18n/help.ts` + manual em `commands/help.ts` |
-| Mudar texto de UI | `src/i18n/messages.ts` (`t()`) |
-| Mudar texto de help | `src/i18n/help.ts` + map em `src/commands/help.ts` |
-| Adicionar driver DB | `src/db/introspect-<name>.ts` + caso em `src/db/introspect.ts` + `execute-<name>` em `src/db/execute.ts` |
-| Adicionar endpoint de API | `RawSdk` + `AuthenticatedClient` + `getAuthenticatedClient` em `src/sdk/client.ts` |
-| Mudar schema persistido | `StoredConnector` em `src/config/connectors-store.ts` (migrar manualmente — sem migration runner) |
-| Adicionar entry de history | `HistoryEntry` em `src/history/store.ts` + escrever em `appendHistory` no comando |
+| Add a subcommand | `src/commands/<name>.ts` + register in `src/cli/program.ts` + entry in `src/i18n/help.ts` + manual in `commands/help.ts` |
+| Change UI text | `src/i18n/messages.ts` (`t()`) |
+| Change help text | `src/i18n/help.ts` + map in `src/commands/help.ts` |
+| Add a DB driver | `src/db/introspect-<name>.ts` + case in `src/db/introspect.ts` + `execute-<name>` in `src/db/execute.ts` |
+| Add an API endpoint | `RawSdk` + `AuthenticatedClient` + `getAuthenticatedClient` in `src/sdk/client.ts` |
+| Change the persisted schema | `StoredConnector` in `src/config/connectors-store.ts` (migrate manually — no migration runner) |
+| Add a history entry | `HistoryEntry` in `src/history/store.ts` + write in `appendHistory` from the command |
 
-## Verificação local
+## Local verification
 
 ```bash
-bun install --frozen-lockfile   # lockfile é obrigatório no CI
+bun install --frozen-lockfile   # the lockfile is mandatory in CI
 bun run check                   # biome + tsc --noEmit (lint+typecheck)
-bun test                        # 97 specs (sqlite + demo + TUI inclusos)
+bun test                        # 117 specs (sqlite + demo + TUI included)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
 ./bin/easysql --help            # smoke
 ```
 
-`.env.example` documenta `EASYSQL_API_URL` (default `http://localhost:8787` em dev) e `EASYSQL_LOG_LEVEL`.
+`.env.example` documents `EASYSQL_API_URL` (default `http://localhost:8787` in dev) and `EASYSQL_LOG_LEVEL`.
 
-## Estado atual
+## Current state
 
-- 97/97 testes passando (`bun test`).
-- `bun run check` limpo (warnings menores de `noExplicitAny` em SDK wrapper e 1 `useImportType` — não bloqueiam).
-- Binário standalone `bin/easysql` já construído (~92 MB).
-- `bin/` e `dist/` estão no `.gitignore` — não comitar.
-- Repo público: https://github.com/Clearsoft-net/easysql-cli (branch `main`).
-- SDK: `@clearsoft/easysql-sdk` no npm, consumido via dep semver `^1.1.0` (1.1.0 introduziu `type: "sqlite"` em `ConnectorCreate`, renomeou o campo de SQL de `sql` → `sql_generated`, e adicionou `POST /v1/queries/:id/answer`).
+- 117/117 tests passing (`bun test`).
+- `bun run check` clean (minor `noExplicitAny` warnings in the SDK wrapper and 1 `useImportType` — non-blocking).
+- Standalone binary `bin/easysql` already built (~92 MB).
+- `bin/` and `dist/` are in `.gitignore` — do not commit.
+- Public repo: https://github.com/Clearsoft-net/easysql-cli (branch `main`).
+- SDK: `@clearsoft/easysql-sdk` on npm, consumed via the semver dep `^1.1.0` (1.1.0 introduced `type: "sqlite"` in `ConnectorCreate`, renamed the SQL field from `sql` → `sql_generated`, and added `POST /v1/queries/:id/answer`).

@@ -12,10 +12,10 @@
 		".": "./dist/index.js"
 	},
 	"files": [
-		"dist",
-		"bin"
+		"dist"
 	],
 	"scripts": {
+		"prepublishOnly": "bun run build",
 		"dev": "bun run src/cli.ts",
 		"build": "bun run scripts/build.ts",
 		"build:compile": "bun run scripts/build.ts --compile",

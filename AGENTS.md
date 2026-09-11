@@ -83,8 +83,6 @@ src/
 │   └── execute.ts              # executeSelect() with validateSelectOnly() first
 ├── sdk/
 │   └── client.ts               # @clearsoft/easysql-sdk wrapper + resolveApiUrl()
-├── types/
-│   └── bun-sqlite.d.ts         # ambient declarations for bun:sqlite (without @types/bun)
 ├── i18n/
 │   ├── messages.ts             # UI strings (errors/prompts/success/info)
 │   └── help.ts                 # help manual (HELP_TOP/HELP_COMMANDS/HELP_DEMO/...)

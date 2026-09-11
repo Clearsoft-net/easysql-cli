@@ -18,15 +18,23 @@
 
 import { existsSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
+import { isatty } from "node:tty";
 import type { Command } from "commander";
-import { CliError, NotLoggedInError } from "../cli/errors.js";
-import { upsertConnector } from "../config/connectors-store.js";
+import { ApiError, CliError, NotLoggedInError } from "../cli/errors.js";
+import {
+	findConnectorById,
+	findConnectorByName,
+	loadConnectors,
+	removeConnector,
+	upsertConnector,
+} from "../config/connectors-store.js";
 import {
 	introspectDatabase,
 	mergeConnection,
 	type ParsedConnection,
 	parseConnectionUrl,
 } from "../db/introspect.js";
+import { syncLocalConnector } from "../db/sync-connector.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
 import { getSavedClient } from "../sdk/client.js";
@@ -245,7 +253,7 @@ function registerAdd(program: Command): void {
 		.option("--password <pass>", "Database password (otherwise prompted)")
 		.option("--database <db>", "Database name")
 		.option("--ssl", "Require SSL/TLS")
-		.option("--non-interactive, -y", "Disable prompts; fail when required values are missing")
+		.option("-y, --non-interactive", "Disable prompts; fail when required values are missing")
 		.action(async (opts: ConnectorAddOptions) => {
 			let conn: ParsedConnection;
 			try {
@@ -281,19 +289,99 @@ function registerAdd(program: Command): void {
 
 function registerSync(program: Command): void {
 	program
-		.command("sync")
-		.description("Re-extract and push schema metadata")
-		.option("--id <id>", "Sync a specific connector")
-		.action(async (opts: { id?: string }) => {
-			const { client } = getSavedClient();
-			if (opts.id) {
-				throw new Error(
-					"--id mode is not yet supported (sync-by-name requires local DB config storage).",
-				);
+		.command("sync [name]")
+		.description("Re-introspect a local connector and push the updated schema")
+		.option("--id <id>", "Sync a specific connector by id")
+		.option("--password <pass>", "Database password (otherwise $EASYSQL_DB_PASSWORD or prompt)")
+		.option("-y, --non-interactive", "Disable prompts; fail when the password is missing")
+		.action(
+			async (
+				name: string | undefined,
+				opts: { id?: string; password?: string; nonInteractive?: boolean },
+			) => {
+				let stored = opts.id
+					? findConnectorById(opts.id)
+					: name
+						? findConnectorByName(name)
+						: undefined;
+				if (!stored && !opts.id && !name) {
+					const list = loadConnectors();
+					if (list.length === 1) stored = list[0];
+				}
+				if (!stored) {
+					const list = loadConnectors();
+					if (list.length === 0) {
+						throw new CliError(
+							"No local connectors to sync. Run `easysql connector add` first.",
+							1,
+						);
+					}
+					throw new CliError(
+						`Specify a connector to sync: ${list.map((c) => c.name).join(", ")}`,
+						1,
+					);
+				}
+
+				let password = "";
+				if (stored.type !== "sqlite") {
+					password = opts.password ?? process.env.EASYSQL_DB_PASSWORD ?? "";
+					if (!password) {
+						if (opts.nonInteractive) {
+							throw new CliError(
+								"Database password required (--password or $EASYSQL_DB_PASSWORD).",
+								1,
+							);
+						}
+						const secret = await promptSecret(`${t().prompts.passwordPrompt}: `);
+						if (!secret) throw new CliError("Database password required.", 1);
+						password = secret;
+					}
+				}
+
+				printInfo(t().info.introspectingDb);
+				const result = await syncLocalConnector(stored, password);
+				printSuccess(t().success.connectorSynced(stored.name, result.tables ?? 0));
+			},
+		);
+}
+
+function registerRemove(program: Command): void {
+	program
+		.command("remove <name>")
+		.description("Remove a local connector (and delete it from EasySQL)")
+		.option("-y, --yes", "Skip the confirmation prompt")
+		.action(async (name: string, opts: { yes?: boolean }) => {
+			const stored = findConnectorByName(name);
+			if (!stored) throw new CliError(t().errors.connectorNotFound(name), 1);
+
+			if (!opts.yes) {
+				if (!isatty(0)) {
+					throw new CliError(t().errors.removeNonInteractive, 1);
+				}
+				const answer = await promptLine(`${t().prompts.confirmRemove(name)} `);
+				if (!answer || !answer.trim().toLowerCase().startsWith("y")) {
+					printInfo(t().info.removeAborted);
+					return;
+				}
 			}
-			throw new Error(
-				"To resync a connector, run `easysql connector add --name ...` again with the same name; the server updates the schema in place.",
-			);
+
+			if (stored.id) {
+				try {
+					const { client } = getSavedClient();
+					await client.deleteConnector(stored.id);
+				} catch (err) {
+					if (err instanceof ApiError && err.status === 404) {
+						// Already gone server-side — proceed with the local cleanup.
+					} else if (err instanceof NotLoggedInError) {
+						printInfo(t().info.connectorRemovedLocalOnly);
+					} else {
+						throw err;
+					}
+				}
+			}
+
+			removeConnector(name);
+			printSuccess(t().success.connectorRemoved(name));
 		});
 }
 
@@ -329,7 +417,6 @@ export function registerConnector(program: Command): void {
 	const group = program.command("connector").description("Manage local connectors");
 	registerAdd(group);
 	registerSync(group);
+	registerRemove(group);
 	registerList(group);
 }
-
-void NotLoggedInError; // re-exported for clarity

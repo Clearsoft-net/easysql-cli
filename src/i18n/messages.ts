@@ -15,6 +15,9 @@ export const MESSAGES = {
 			configReadError: (msg: string) => `Could not read config: ${msg}`,
 			configWriteError: (msg: string) => `Could not write config: ${msg}`,
 			noConnector: "No connector selected. Use --connector or run 'easysql connector list'.",
+			connectorNotFound: (name: string) => `Connector '${name}' not found.`,
+			removeNonInteractive:
+				"Refusing to remove without confirmation in a non-interactive shell. Pass --yes.",
 			multipleConnectors: (n: number) =>
 				`${n} connectors available. Use --connector <id> to pick one.`,
 			queryRejected: (sql: string, reason: string) =>
@@ -37,12 +40,15 @@ export const MESSAGES = {
 			dbPortPrompt: "Database port",
 			dbUserPrompt: "Database user",
 			dbNamePrompt: "Database name",
+			confirmRemove: (name: string) => `Remove connector '${name}'? (y/N)`,
 		},
 		success: {
 			loggedIn: "Logged in successfully.",
 			loggedOut: "Logged out.",
 			connectorAdded: (name: string, id: string) => `Connector '${name}' added (id: ${id}).`,
-			connectorSynced: (n: number) => `Synced schema for ${n} connector(s).`,
+			connectorRemoved: (name: string) => `Connector '${name}' removed.`,
+			connectorSynced: (name: string, tables: number) =>
+				`Synced '${name}' (${tables} table${tables === 1 ? "" : "s"}).`,
 			queryDone: (rows: number) => `Returned ${rows} row(s).`,
 			updated: (from: string, to: string) => `Updated ${from} → ${to}.`,
 			updateAlreadyLatest: (current: string, latest: string) =>
@@ -53,6 +59,9 @@ export const MESSAGES = {
 			generatingSql: "Generating SQL via EasySQL…",
 			executingSql: "Executing SQL locally…",
 			introspectingDb: "Introspecting local database schema…",
+			removeAborted: "Aborted. Nothing was removed.",
+			connectorRemovedLocalOnly:
+				"Not logged in — removed locally only (the server copy was not touched).",
 		},
 	},
 } as const;

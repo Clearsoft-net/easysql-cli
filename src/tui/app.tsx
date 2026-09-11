@@ -22,13 +22,14 @@
  */
 
 import { Box, Text, useApp, useInput, useWindowSize } from "ink";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	findConnectorByName,
 	loadConnectors,
 	type StoredConnector,
 } from "../config/connectors-store.js";
-import { loadConfig } from "../config/store.js";
+import { loadConfig, saveConfig } from "../config/store.js";
+import { getSavedClient } from "../sdk/client.js";
 import { Footer, Header, TabBar } from "./chrome.js";
 import { ConnectorsScreen } from "./screens/connectors.js";
 import { HelpScreen } from "./screens/help.js";
@@ -74,6 +75,39 @@ export function App({ initialConnector }: AppProps) {
 		return list.length === 1 ? list[0]?.name : undefined;
 	});
 	const cfg = loadConfig();
+	// Active user identity/plan. Seeded from the config cache (written at
+	// login) so it renders instantly and survives offline, then refreshed
+	// from /v1/auth/me on mount when credentials are available.
+	const [user, setUser] = useState<{ email?: string; plan?: string }>(() => ({
+		email: cfg.user_email,
+		plan: cfg.plan_name,
+	}));
+
+	useEffect(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const { client } = getSavedClient();
+				const me = await client.me();
+				if (cancelled) return;
+				setUser({ email: me.email, plan: me.active_plan?.name });
+				const current = loadConfig();
+				if (current.user_email !== me.email || current.plan_name !== me.active_plan?.name) {
+					saveConfig({
+						...current,
+						user_email: me.email,
+						user_name: me.name,
+						plan_name: me.active_plan?.name,
+					});
+				}
+			} catch {
+				// Offline or not logged in — keep the cached identity.
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	useInput((input, key) => {
 		if (key.ctrl && input === "c") {
@@ -121,6 +155,8 @@ export function App({ initialConnector }: AppProps) {
 				connectorType={activeConnector?.type}
 				apiUrl={apiUrl}
 				online={cfg.api_key.length > 0}
+				userEmail={user.email}
+				planName={user.plan}
 			/>
 			<TabBar active={screen} />
 			<Box flexDirection="column" flexGrow={1} overflow="hidden" paddingX={1}>

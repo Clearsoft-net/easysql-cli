@@ -68,6 +68,31 @@ async function call<T>(fn: () => Promise<SdkResult<T>>): Promise<T> {
 	return result.data;
 }
 
+/** Like `call`, but for endpoints that return no content (e.g. 204). */
+async function callVoid(fn: () => Promise<SdkResult<unknown>>): Promise<void> {
+	let result: SdkResult<unknown>;
+	try {
+		result = await fn();
+	} catch (err) {
+		const e = isHttpErrorLike(err);
+		if (e?.status !== undefined) {
+			throw new ApiError(e.status, e.message ?? "request failed");
+		}
+		const msg = err instanceof Error ? err.message : String(err);
+		if (msg.includes("fetch") || msg.includes("network") || msg.includes("connect")) {
+			throw new NetworkError(msg);
+		}
+		throw new ApiError(0, msg);
+	}
+	if (result.error) {
+		const e = isHttpErrorLike(result.error);
+		if (e?.status !== undefined) {
+			throw new ApiError(e.status, e.message ?? "request failed");
+		}
+		throw new ApiError(0, e?.message ?? "unknown error");
+	}
+}
+
 export function resolveApiUrl(override?: string): string {
 	if (override && override.length > 0) return override;
 	if (process.env.EASYSQL_API_URL && process.env.EASYSQL_API_URL.length > 0) {
@@ -78,15 +103,34 @@ export function resolveApiUrl(override?: string): string {
 	return DEFAULT_API_URL;
 }
 
+export interface ActivePlan {
+	id: string;
+	name: string;
+	max_queries_daily: number;
+	max_queries_weekly: number;
+	max_queries_monthly: number;
+}
+
+export interface UserMe {
+	id: string;
+	email: string;
+	name: string;
+	locale: string;
+	email_verified: boolean;
+	email_verified_at?: string | null;
+	created_at: string;
+	active_plan: ActivePlan | null;
+}
+
 export interface AuthenticatedClient {
-	me: () => Promise<unknown>;
+	me: () => Promise<UserMe>;
 	listApiKeys: () => Promise<unknown>;
 	createApiKey: (body: unknown) => Promise<unknown>;
 	deleteApiKey: (id: string) => Promise<unknown>;
 	listConnectors: () => Promise<unknown>;
 	createConnector: (body: unknown) => Promise<unknown>;
 	updateConnector: (body: unknown, id: string) => Promise<unknown>;
-	deleteConnector: (id: string) => Promise<unknown>;
+	deleteConnector: (id: string) => Promise<void>;
 	getConnectorSchema: (id: string) => Promise<unknown>;
 	syncConnector: (body: unknown, id: string) => Promise<unknown>;
 	createQuery: (body: unknown) => Promise<unknown>;
@@ -99,7 +143,7 @@ export interface AuthenticatedClient {
 export function getAuthenticatedClient(apiKey: string, apiUrl: string): AuthenticatedClient {
 	const sdk = createEasySQLClient({ baseUrl: apiUrl, accessToken: apiKey }) as RawSdk;
 	return {
-		me: () => call(() => sdk.me()),
+		me: () => call(() => sdk.me()) as Promise<UserMe>,
 		listApiKeys: () => call(() => sdk.listApiKeys()),
 		createApiKey: (body) => call(() => sdk.createApiKey(body as never)),
 		deleteApiKey: (id) => call(() => sdk.deleteApiKey({ key_id: id } as never)),
@@ -107,7 +151,7 @@ export function getAuthenticatedClient(apiKey: string, apiUrl: string): Authenti
 		createConnector: (body) => call(() => sdk.createConnector(body as never)),
 		updateConnector: (body, id) =>
 			call(() => sdk.updateConnector(body as never, { path: { connector_id: id } } as never)),
-		deleteConnector: (id) => call(() => sdk.deleteConnector({ connector_id: id } as never)),
+		deleteConnector: (id) => callVoid(() => sdk.deleteConnector({ connector_id: id } as never)),
 		getConnectorSchema: (id) =>
 			call(() => sdk.getConnectorSchema({ connector_id: id } as never)),
 		syncConnector: (body, id) =>

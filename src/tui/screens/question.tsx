@@ -24,14 +24,20 @@ import { Box, Text, useInput } from "ink";
 import { useEffect, useState } from "react";
 import {
 	findConnectorByName,
+	type StoredConnector,
 	upsertConnector,
 } from "../../config/connectors-store.js";
 import { executeSelect, type LocalQueryResult } from "../../db/execute.js";
 import { appendHistory } from "../../history/store.js";
-import { renderResult } from "../../output/table.js";
 import { getSavedClient } from "../../sdk/client.js";
 import { promptSecret } from "../../util/prompt.js";
 import type { ScreenName } from "../app.js";
+import { Cursor } from "../cursor.js";
+import { ResultTable } from "../result-table.js";
+import { Spinner } from "../spinner.js";
+import { SqlText } from "../sql-highlight.js";
+import { ConnectorSync } from "./connector-sync.js";
+import { UsageView } from "./usage.js";
 
 type Status = "idle" | "generating" | "executing" | "ok" | "error";
 
@@ -62,7 +68,9 @@ type SlashCmd =
 	| { kind: "help" }
 	| { kind: "quit" }
 	| { kind: "screen"; screen: ScreenName }
-	| { kind: "clear" };
+	| { kind: "clear" }
+	| { kind: "sync" }
+	| { kind: "usage" };
 
 function parseSlash(cmd: string): SlashCmd | { kind: "unknown"; raw: string } {
 	const lower = cmd.trim().toLowerCase();
@@ -91,9 +99,40 @@ function parseSlash(cmd: string): SlashCmd | { kind: "unknown"; raw: string } {
 		case "clear":
 		case "cls":
 			return { kind: "clear" };
+		case "sync":
+		case "sy":
+			return { kind: "sync" };
+		case "usage":
+		case "u":
+			return { kind: "usage" };
 		default:
 			return { kind: "unknown", raw: cmd };
 	}
+}
+
+interface SlashCommand {
+	name: string;
+	aliases: string[];
+	desc: string;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+	{ name: "help", aliases: ["h", "?"], desc: "Show keybindings" },
+	{ name: "connectors", aliases: ["c", "1"], desc: "Go to Connectors" },
+	{ name: "history", aliases: ["h2", "2"], desc: "Go to History" },
+	{ name: "question", aliases: ["q2", "3"], desc: "Go to Question" },
+	{ name: "clear", aliases: ["cls"], desc: "Clear buffer and result" },
+	{ name: "sync", aliases: ["sy"], desc: "Sync the active connector" },
+	{ name: "usage", aliases: ["u"], desc: "Show plan usage/quota" },
+	{ name: "quit", aliases: ["q", "exit"], desc: "Quit the TUI" },
+];
+
+function filterCommands(query: string): SlashCommand[] {
+	const q = query.toLowerCase();
+	if (q === "") return SLASH_COMMANDS;
+	return SLASH_COMMANDS.filter(
+		(c) => c.name.startsWith(q) || c.aliases.some((a) => a.startsWith(q)),
+	);
 }
 
 export function QuestionScreen({
@@ -106,23 +145,36 @@ export function QuestionScreen({
 	const [buf, setBuf] = useState("");
 	const [slashBuf, setSlashBuf] = useState<string | null>(null);
 	const [slashHint, setSlashHint] = useState<string | null>(null);
+	const [slashSel, setSlashSel] = useState(0);
 	const [status, setStatus] = useState<Status>("idle");
 	const [sql, setSql] = useState<string | null>(null);
 	const [result, setResult] = useState<LocalQueryResult | null>(null);
 	const [err, setErr] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [syncTarget, setSyncTarget] = useState<StoredConnector | null>(null);
+	const [usageOpen, setUsageOpen] = useState(false);
 
 	useEffect(() => {
 		onBusyChange?.(busy);
 	}, [busy, onBusyChange]);
 
 	useInput((input, key) => {
+		if (syncTarget || usageOpen) return;
 		if (busy) return;
 
 		// Slash-command mode.
 		if (slashBuf !== null) {
+			const matches = filterCommands(slashBuf.slice(1));
+			if (key.upArrow || key.downArrow) {
+				if (matches.length > 0) {
+					const n = matches.length;
+					setSlashSel((s) => (key.upArrow ? (s - 1 + n) % n : (s + 1) % n));
+				}
+				return;
+			}
 			if (key.return) {
-				const parsed = parseSlash(slashBuf);
+				const chosen = matches[Math.min(slashSel, matches.length - 1)];
+				const parsed = parseSlash(chosen ? `/${chosen.name}` : slashBuf);
 				switch (parsed.kind) {
 					case "help":
 						onOpenHelp?.();
@@ -145,6 +197,22 @@ export function QuestionScreen({
 						setSlashBuf(null);
 						setSlashHint(null);
 						return;
+					case "sync": {
+						const target = findConnectorByName(connector);
+						if (!target) {
+							setSlashHint(`No connector named '${connector}'.`);
+							return;
+						}
+						setSyncTarget(target);
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
+					}
+					case "usage":
+						setUsageOpen(true);
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
 					case "unknown":
 						setSlashHint(`Unknown command: /${parsed.raw.slice(1) || ""}`);
 						// keep slashBuf so the user can edit
@@ -157,6 +225,7 @@ export function QuestionScreen({
 				return;
 			}
 			if (key.backspace || key.delete) {
+				setSlashSel(0);
 				setSlashBuf((s) => {
 					if (s === null) return null;
 					const next = s.slice(0, -1);
@@ -174,6 +243,7 @@ export function QuestionScreen({
 				// Strip any leading `/` already in the buffer (defence
 				// against pasted multi-char input).
 				const rest = input.replace(/^\/+/, "");
+				setSlashSel(0);
 				setSlashBuf((s) => (s ?? "") + rest);
 			}
 			return;
@@ -198,6 +268,7 @@ export function QuestionScreen({
 			// as the slash buffer so pasted strings ("/help", "/quit")
 			// and the test harness (which batches chars into one event)
 			// both work.
+			setSlashSel(0);
 			setSlashBuf(input);
 			setSlashHint(null);
 			return;
@@ -273,55 +344,103 @@ export function QuestionScreen({
 	}
 
 	const showWelcome = status === "idle" && !result && !sql && buf.length === 0;
+	const slashMatches = slashBuf === null ? [] : filterCommands(slashBuf.slice(1));
+	const slashSelClamped =
+		slashMatches.length === 0 ? 0 : Math.min(slashSel, slashMatches.length - 1);
 
 	return (
 		<Box paddingX={1} flexDirection="column" flexGrow={1}>
-			<Box borderStyle="round" borderColor="green" paddingX={1}>
-				<Text color="green">›</Text>
-				<Text> {buf.length === 0 ? <Text dimColor>(type a question, hit Enter · / for commands)</Text> : buf}</Text>
-			</Box>
+			{slashBuf === null ? (
+				<Box flexDirection="column" flexGrow={1} overflow="hidden">
+					{showWelcome && (
+						<Box marginTop={1} flexDirection="column">
+							<Text dimColor>Examples:</Text>
+							<Text color="cyan">  • Top 10 customers by revenue</Text>
+							<Text color="cyan">  • How many orders last week?</Text>
+							<Text color="cyan">  • Products with low stock</Text>
+						</Box>
+					)}
 
-			{showWelcome && (
-				<Box marginTop={1} flexDirection="column">
-					<Text dimColor>Examples:</Text>
-					<Text color="cyan">  • Top 10 customers by revenue</Text>
-					<Text color="cyan">  • How many orders last week?</Text>
-					<Text color="cyan">  • Products with low stock</Text>
+					<Box marginTop={1} flexDirection="column">
+						{status === "generating" && <Spinner label="Generating SQL…" />}
+						{status === "executing" && <Spinner label="Executing locally…" />}
+						{err && <Text color="red">Error: {err}</Text>}
+					</Box>
+
+					{result && (
+						<Box marginTop={1} flexDirection="column">
+							<Text dimColor>
+								{result.row_count} row(s) in {result.duration_ms}ms
+							</Text>
+							<ResultTable columns={result.columns} rows={result.rows} />
+						</Box>
+					)}
+
+					{sql && (
+						<Box marginTop={1} flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1}>
+							<Text dimColor>SQL</Text>
+							<SqlText sql={sql} />
+						</Box>
+					)}
 				</Box>
+			) : (
+				<Box flexGrow={1} />
 			)}
 
-			{slashBuf !== null && (
-				<Box marginTop={1} flexDirection="column">
+			{usageOpen ? (
+				<UsageView onExit={() => setUsageOpen(false)} />
+			) : syncTarget ? (
+				<ConnectorSync
+					connector={syncTarget}
+					title="/sync"
+					onExit={() => setSyncTarget(null)}
+				/>
+			) : slashBuf !== null ? (
+				<Box flexDirection="column">
+					{slashMatches.length > 0 && (
+						<Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
+							{slashMatches.map((c, i) => {
+								const isSel = i === slashSelClamped;
+								return (
+									<Text
+										key={c.name}
+										color={isSel ? "black" : undefined}
+										backgroundColor={isSel ? "cyan" : undefined}
+										bold={isSel}
+									>
+										{isSel ? "› " : "  "}
+										{`/${c.name}`.padEnd(12)}
+										{"  "}
+										<Text dimColor={!isSel}>{c.desc}</Text>
+									</Text>
+								);
+							})}
+						</Box>
+					)}
 					<Box borderStyle="round" borderColor="magenta" paddingX={1}>
 						<Text color="magenta">/</Text>
-						<Text> {slashBuf.length === 1 ? <Text dimColor>(help, quit, connectors, history, clear)</Text> : slashBuf.slice(1)}</Text>
+						<Text>
+							{" "}
+							{slashBuf.slice(1).length === 0 ? (
+								<Text dimColor>type a command…</Text>
+							) : (
+								slashBuf.slice(1)
+							)}
+						</Text>
+						<Cursor color="magenta" />
 					</Box>
-					{slashHint && (
-						<Text color="yellow"> {slashHint}</Text>
+					{slashMatches.length === 0 ? (
+						<Text color="yellow"> No matching command · Esc to cancel</Text>
+					) : (
+						<Text dimColor> ↑/↓ select · Enter run · Esc cancel · Backspace edit</Text>
 					)}
-					<Text dimColor> Enter to run · Esc to cancel · Backspace to edit</Text>
+					{slashHint && <Text color="yellow"> {slashHint}</Text>}
 				</Box>
-			)}
-
-			<Box marginTop={1} flexDirection="column">
-				{status === "generating" && <Text color="cyan">Generating SQL…</Text>}
-				{status === "executing" && <Text color="cyan">Executing locally…</Text>}
-				{err && <Text color="red">Error: {err}</Text>}
-			</Box>
-
-			{sql && (
-				<Box marginTop={1} flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1}>
-					<Text dimColor>SQL</Text>
-					<Text>{sql}</Text>
-				</Box>
-			)}
-
-			{result && (
-				<Box marginTop={1} flexDirection="column">
-					<Text dimColor>
-						{result.row_count} row(s) in {result.duration_ms}ms
-					</Text>
-					<Text>{renderResult("table", result.columns, result.rows)}</Text>
+			) : (
+				<Box borderStyle="round" borderColor="green" paddingX={1}>
+					<Text color="green">›</Text>
+					<Text> {buf.length === 0 ? <Text dimColor>(type a question, hit Enter · / for commands)</Text> : buf}</Text>
+					<Cursor />
 				</Box>
 			)}
 		</Box>

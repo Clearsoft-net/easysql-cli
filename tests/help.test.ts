@@ -34,6 +34,7 @@ describe("renderHelp", () => {
 			"connector add",
 			"connector sync",
 			"connector list",
+			"connector remove",
 			"query",
 			"usage",
 			"history",

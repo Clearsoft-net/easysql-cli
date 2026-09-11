@@ -59,6 +59,24 @@ describe("TUI App", () => {
 		expect(frame).toContain("[Ctrl-C] quit");
 	});
 
+	it("shows the cached active user + plan in the header", () => {
+		writeFileSync(
+			join(tmpDir as string, "config.json"),
+			JSON.stringify({
+				api_url: "",
+				api_key: "",
+				last_login_at: "",
+				user_email: "joao@example.com",
+				user_name: "Joao",
+				plan_name: "Pro",
+			}),
+		);
+		const { lastFrame } = render(<App />);
+		expect(lastFrame()).toContain("joao@example.com");
+		expect(lastFrame()).toContain("plan:");
+		expect(lastFrame()).toContain("Pro");
+	});
+
 	it("Tab cycles from Question to Connectors", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("\t");
@@ -102,12 +120,26 @@ describe("TUI App", () => {
 		expect(frame).not.toContain("(type, hit Enter");
 	});
 
-	it("'/' opens the slash-prompt inside Question screen", async () => {
+	it("'/' opens the command dropdown inside Question screen", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("/");
 		await new Promise((r) => setTimeout(r, 50));
 		const frame = lastFrame();
-		expect(frame).toContain("help, quit, connectors, history, clear");
+		expect(frame).toContain("/help");
+		expect(frame).toContain("/connectors");
+		expect(frame).toContain("/history");
+		expect(frame).toContain("↑/↓ select");
+	});
+
+	it("typing filters the command dropdown", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("/");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("he");
+		await new Promise((r) => setTimeout(r, 50));
+		const frame = lastFrame();
+		expect(frame).toContain("/help");
+		expect(frame).not.toContain("/connectors");
 	});
 
 	it("/help from slash-prompt opens the help modal", async () => {
@@ -143,6 +175,60 @@ describe("TUI App", () => {
 		stdin.write("\u001b");
 		await new Promise((r) => setTimeout(r, 50));
 		expect(lastFrame()).not.toContain("keybindings");
+	});
+
+	it("Connectors: the trailing '+ Add a connector…' row opens the add form", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("+ Add a connector");
+		stdin.write("j"); // move off the connector onto the add row
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r"); // Enter
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Add connector");
+		stdin.write("\u001b");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).not.toContain("Add connector");
+		expect(lastFrame()).toContain("Connectors (1)");
+	});
+
+	it("Connectors: 'd' opens the remove confirmation", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("d");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Remove connector");
+		expect(lastFrame()).toContain("local-demo");
+	});
+
+	it("Connectors: 's' opens the sync runner", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("s");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Sync connector: local-demo");
+	});
+
+	it("Question: '/sync' opens the sync runner for the active connector", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("/sync");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("/sync: local-demo");
+	});
+
+	it("Question: '/usage' opens the usage panel", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("/usage");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Usage");
+		expect(lastFrame()).toContain("Plan:");
 	});
 
 	it("Question screen hint stays visible by default", () => {

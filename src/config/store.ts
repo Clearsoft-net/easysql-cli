@@ -18,6 +18,9 @@ export interface CliConfig {
 	api_url: string;
 	api_key: string;
 	last_login_at: string;
+	user_email?: string;
+	user_name?: string;
+	plan_name?: string;
 }
 
 const EMPTY: CliConfig = {
@@ -46,11 +49,15 @@ export function loadConfig(): CliConfig {
 	try {
 		const raw = readFileSync(path, "utf8");
 		const parsed = JSON.parse(raw) as Partial<CliConfig>;
-		return {
+		const out: CliConfig = {
 			api_url: typeof parsed.api_url === "string" ? parsed.api_url : "",
 			api_key: typeof parsed.api_key === "string" ? parsed.api_key : "",
 			last_login_at: typeof parsed.last_login_at === "string" ? parsed.last_login_at : "",
 		};
+		if (typeof parsed.user_email === "string") out.user_email = parsed.user_email;
+		if (typeof parsed.user_name === "string") out.user_name = parsed.user_name;
+		if (typeof parsed.plan_name === "string") out.plan_name = parsed.plan_name;
+		return out;
 	} catch (err) {
 		// Treat malformed JSON as "no config" so the user can re-run login
 		// instead of being blocked. The file is left untouched so they can

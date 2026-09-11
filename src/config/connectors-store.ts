@@ -66,6 +66,14 @@ export function upsertConnector(entry: StoredConnector): void {
 	saveConnectors(list);
 }
 
+export function removeConnector(name: string): boolean {
+	const list = loadConnectors();
+	const next = list.filter((c) => c.name !== name);
+	if (next.length === list.length) return false;
+	saveConnectors(next);
+	return true;
+}
+
 export function findConnectorByName(name: string): StoredConnector | undefined {
 	return loadConnectors().find((c) => c.name === name);
 }

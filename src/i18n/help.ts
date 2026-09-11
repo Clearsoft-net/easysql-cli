@@ -32,6 +32,7 @@ Commands:
   connector add         Add a local MySQL/Postgres/SQLite connector
   connector sync        Re-extract and push schema metadata
   connector list        List connectors known to EasySQL
+  connector remove      Remove a local connector (and delete it from EasySQL)
   query "<question>"    Generate SQL and run it against the local DB
   usage                 Show plan consumption (quota used vs remaining)
   history               Show the local read-only question log
@@ -65,7 +66,7 @@ error instead.
 Options:
   --api-key <key>       Provide the key inline (otherwise prompted securely)
   --api-url <url>       Override the API base URL for this login only
-  --non-interactive, -y  Disable prompts; fail when required values are missing
+  -y, --non-interactive  Disable prompts; fail when required values are missing
 
 Example:
   easysql login
@@ -113,7 +114,7 @@ SQLite-specific:
 
 Options:
   --ssl                 Require SSL/TLS
-  --non-interactive, -y  Disable prompts; fail when required values are missing
+  -y, --non-interactive  Disable prompts; fail when required values are missing
 
 Example:
   easysql connector add \\
@@ -130,16 +131,26 @@ Example:
 `.trim();
 
 export const HELP_CONNECTOR_SYNC = `
-Usage: easysql connector sync [options]
+Usage: easysql connector sync [name] [options]
 
-Re-extract the schema from a registered local database and push the
-updated metadata to EasySQL.
+Re-introspect a locally-registered connector and push the updated schema
+metadata to EasySQL (POST /v1/connectors/{id}/sync). The local database is
+contacted again, so a password is required for MySQL/Postgres connectors
+(SQLite has none); it is used in memory only and never persisted.
+
+With no argument and exactly one local connector, that connector is synced.
+
+Arguments:
+  [name]                Connector name (from \`easysql connector list\`)
 
 Options:
-  --id <connector-id>   Sync a specific connector (default: sync all)
+  --id <connector-id>   Sync a specific connector by server id
+  --password <pass>     Database password (otherwise $EASYSQL_DB_PASSWORD or prompted)
+  -y, --non-interactive  Fail instead of prompting when the password is missing
 
 Example:
   easysql connector sync
+  easysql connector sync local-demo
   easysql connector sync --id <connector-uuid>
 `.trim();
 
@@ -147,6 +158,24 @@ export const HELP_CONNECTOR_LIST = `
 Usage: easysql connector list
 
 List all connectors known to your EasySQL account.
+`.trim();
+
+export const HELP_CONNECTOR_REMOVE = `
+Usage: easysql connector remove <name> [options]
+
+Remove a locally-registered connector. Deletes it from the EasySQL API
+(the server-side schema cache) and from the local connectors.json. When
+not logged in, only the local entry is removed.
+
+By default it asks for confirmation. Pass --yes (or -y) to skip the
+prompt — required in non-interactive shells.
+
+Options:
+  -y, --yes             Skip the confirmation prompt
+
+Example:
+  easysql connector remove local-demo
+  easysql connector remove local-demo --yes
 `.trim();
 
 export const HELP_QUERY = `

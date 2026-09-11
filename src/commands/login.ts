@@ -16,7 +16,7 @@ import { ApiError } from "../cli/errors.js";
 import { saveConfig } from "../config/store.js";
 import { t } from "../i18n/messages.js";
 import { printError, printSuccess } from "../output/print.js";
-import { getAuthenticatedClient, resolveApiUrl } from "../sdk/client.js";
+import { getAuthenticatedClient, resolveApiUrl, type UserMe } from "../sdk/client.js";
 import { promptSecret } from "../util/prompt.js";
 
 interface LoginOptions {
@@ -53,15 +53,16 @@ export function registerLogin(program: Command): void {
 		.description("Authenticate with an EasySQL API key")
 		.option("--api-key <key>", "Provide the API key inline (otherwise prompted)")
 		.option("--api-url <url>", "Override the API base URL for this login")
-		.option("--non-interactive, -y", "Disable prompts; fail when required values are missing")
+		.option("-y, --non-interactive", "Disable prompts; fail when required values are missing")
 		.action(async (options: LoginOptions, cmd: Command) => {
 			const apiKey = await resolveApiKey(options);
 			const parentOpts = (cmd.parent?.opts() ?? {}) as { apiUrl?: string };
 			const apiUrl = resolveApiUrl(options.apiUrl ?? parentOpts.apiUrl);
 
+			let user: UserMe;
 			try {
 				const client = getAuthenticatedClient(apiKey, apiUrl);
-				await client.me();
+				user = await client.me();
 			} catch (err) {
 				if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
 					printError(t().errors.invalidApiKey);
@@ -74,6 +75,9 @@ export function registerLogin(program: Command): void {
 				api_url: apiUrl,
 				api_key: apiKey,
 				last_login_at: new Date().toISOString(),
+				user_email: user.email,
+				user_name: user.name,
+				plan_name: user.active_plan?.name,
 			});
 
 			printSuccess(t().success.loggedIn);

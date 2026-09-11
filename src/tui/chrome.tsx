@@ -6,7 +6,7 @@
  * domain logic, no `useInput`.
  */
 
-import { Box, Text } from "ink";
+import { Box, Text, useWindowSize } from "ink";
 import { VERSION } from "../version.js";
 import type { ScreenName } from "./app.js";
 
@@ -15,6 +15,8 @@ interface HeaderProps {
 	connectorType?: string;
 	apiUrl?: string;
 	online?: boolean;
+	userEmail?: string;
+	planName?: string;
 }
 
 /**
@@ -26,9 +28,19 @@ interface HeaderProps {
  * Two-column layout: left column is the brand, right column is the
  * status. Border is double to make it feel like a dashboard header.
  */
-export function Header({ active, connectorType, apiUrl, online }: HeaderProps) {
+export function Header({ active, connectorType, apiUrl, online, userEmail, planName }: HeaderProps) {
+	// Drop the least-important fields as the terminal narrows so the header
+	// never wraps into a broken second line. Email + plan + online are kept
+	// as long as there is room.
+	const { columns } = useWindowSize();
+	const cols = columns ?? 80;
+	const showEmail = cols >= 72;
+	const showType = cols >= 96;
+	const showVersion = cols >= 112;
+	const showApi = cols >= 140;
+
 	const connectorLabel = active
-		? `${active}${connectorType ? ` (${connectorType})` : ""}`
+		? `${active}${connectorType && showType ? ` (${connectorType})` : ""}`
 		: "no connector selected";
 
 	return (
@@ -47,6 +59,7 @@ export function Header({ active, connectorType, apiUrl, online }: HeaderProps) {
 				<Text bold color="cyan">
 					easysql
 				</Text>
+				{userEmail && showEmail && <Text dimColor>  {userEmail}</Text>}
 			</Box>
 			<Box>
 				<Text>
@@ -55,8 +68,12 @@ export function Header({ active, connectorType, apiUrl, online }: HeaderProps) {
 						{connectorLabel}
 					</Text>
 				</Text>
-				<Text dimColor>  │  {VERSION}</Text>
-				{apiUrl && (
+				<Text dimColor>{"  │  plan: "}</Text>
+				<Text color="magenta" bold>
+					{planName ?? "Free"}
+				</Text>
+				{showVersion && <Text dimColor>  │  {VERSION}</Text>}
+				{showApi && apiUrl && (
 					<Text dimColor>
 						{"  "}
 						{apiUrl.replace(/^https?:\/\//, "")}
@@ -83,7 +100,6 @@ const TABS: Tab[] = [
 ];
 
 export function TabBar({ active }: { active: ScreenName }) {
-	const idx = TABS.findIndex((t) => t.value === active);
 	return (
 		<Box
 			flexDirection="row"
@@ -95,19 +111,21 @@ export function TabBar({ active }: { active: ScreenName }) {
 			paddingX={1}
 			flexShrink={0}
 		>
-			<Text dimColor>{"◀ "}</Text>
 			{TABS.map((tab) => {
 				const isActive = tab.value === active;
 				return (
-					<Box key={tab.value} marginRight={3}>
-						<Text color={isActive ? "cyan" : "gray"} bold={isActive}>
-							{isActive ? "▸ " : "  "}
-							{tab.name}
-						</Text>
-					</Box>
+					<Text
+						key={tab.value}
+						color={isActive ? "black" : "gray"}
+						backgroundColor={isActive ? "cyan" : undefined}
+						bold={isActive}
+					>
+						{isActive ? "  ▸ " : "  "}
+						{tab.name}
+						{"  "}
+					</Text>
 				);
 			})}
-			<Text dimColor>{" ▶"}</Text>
 		</Box>
 	);
 }
@@ -119,7 +137,7 @@ interface FooterProps {
 const GLOBAL_HINTS = "[Tab] next screen · Shift+Tab previous · [/] commands · [Ctrl-C] quit";
 
 const SCREEN_HINTS: Record<ScreenName, string> = {
-	connectors: "↑/↓ or j/k navigate · Enter activate",
+	connectors: "↑/↓ or j/k navigate · Enter select · s sync · d remove",
 	history: "←/→ or h/l switch page",
 	question: "Type · Enter submit · Backspace delete · / for commands",
 };

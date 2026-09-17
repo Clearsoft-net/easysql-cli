@@ -60,10 +60,10 @@ describe("introspectSqlite", () => {
 		expect(users?.columns.length).toBe(3);
 		const id = users?.columns.find((c) => c.name === "id");
 		expect(id?.primary_key).toBe(true);
-		expect(id?.type).toBe("INTEGER");
+		expect(id?.type).toBe("integer");
 		const email = users?.columns.find((c) => c.name === "email");
 		expect(email?.nullable).toBe(false);
-		expect(email?.type).toBe("TEXT");
+		expect(email?.type).toBe("text");
 		const age = users?.columns.find((c) => c.name === "age");
 		expect(age?.nullable).toBe(true);
 

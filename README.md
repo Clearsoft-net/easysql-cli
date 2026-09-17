@@ -1,11 +1,28 @@
-# EasySQL CLI / TUI
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Clearsoft-net/easysql-brand/main/logo/01-dark-horizontal.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Clearsoft-net/easysql-brand/main/logo/02-light-horizontal.svg">
+    <img alt="EasySQL Logo" src="https://raw.githubusercontent.com/Clearsoft-net/easysql-brand/main/logo/01-dark-horizontal.svg">
+  </picture>
+</p>
 
-> Ask questions in natural language to your local **MySQL**, **PostgreSQL** or **SQLite** database — straight from your terminal.
+<h1 align="center">EasySQL CLI / TUI</h1>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Clearsoft-net/easysql-cli/ci.yml?branch=main&style=flat-square)](https://github.com/Clearsoft-net/easysql-cli/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/@clearsoft/easysql-cli?color=F97316&style=flat-square)](https://www.npmjs.com/package/@clearsoft/easysql-cli)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Website](https://img.shields.io/badge/Product-easysql.net-F97316?style=flat-square)](https://easysql.net)
+<p align="center">
+  <strong>Official command-line interface for the <a href="https://easysql.net">EasySQL API</a> · A <a href="https://clearsoft.net">Clearsoft</a> Product</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Clearsoft-net/easysql-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Clearsoft-net/easysql-cli/ci.yml?branch=main&style=flat-square" alt="CI Status"></a>
+  <a href="https://www.npmjs.com/package/@clearsoft/easysql-cli"><img src="https://img.shields.io/npm/v/@clearsoft/easysql-cli?color=F97316&style=flat-square" alt="NPM Version"></a>
+  <a href="https://github.com/Clearsoft-net/easysql-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
+  <a href="https://easysql.net"><img src="https://img.shields.io/badge/Product-easysql.net-F97316?style=flat-square" alt="Website"></a>
+  <a href="https://clearsoft.net"><img src="https://img.shields.io/badge/Company-clearsoft.net-0F2B3D?style=flat-square" alt="Company"></a>
+</p>
+
+---
+
+Ask questions in natural language to your local **MySQL**, **PostgreSQL** or **SQLite** database — straight from your terminal.
 
 The **EasySQL CLI** is the open-source counterpart to the WordPress plugin. It runs the full EasySQL query flow client-side:
 

@@ -4,10 +4,13 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.3.0]
+
 ### Changed
 
 - The CLI now runs on Node.js >= 22.13 as well as Bun >= 1.4 — `demo` uses `node:sqlite` and the `bin` shebang is `#!/usr/bin/env node`.
 - Renamed the npm package to `@easysql/cli`.
+- The release workflow now fails when the pushed tag does not match the `package.json` version.
 
 ## [0.2.0]
 
@@ -34,6 +37,7 @@ All notable changes to this project are documented here. The format is based on 
 - Standalone binaries for linux/darwin (x64, arm64) and windows-x64 via GitHub Releases.
 - Local SQL validator (defense in depth) and XDG-compliant storage with `0600` permissions.
 
-[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.1.0

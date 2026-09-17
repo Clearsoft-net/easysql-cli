@@ -17,6 +17,12 @@ describe("userArgs", () => {
 		expect(userArgs(["/usr/bin/node", "dist/bin.js", "query", "hi"])).toEqual(["query", "hi"]);
 	});
 
+	it("strips a package-manager shim (node_modules/.bin, no extension)", () => {
+		expect(
+			userArgs(["/usr/bin/node", "/app/node_modules/.bin/easysql", "connector", "list"]),
+		).toEqual(["connector", "list"]);
+	});
+
 	it("strips the installed binary path", () => {
 		expect(userArgs(["/usr/local/bin/easysql", "usage"])).toEqual(["usage"]);
 	});

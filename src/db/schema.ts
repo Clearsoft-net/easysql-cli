@@ -2,27 +2,26 @@
  * Schema types — the JSON shape that the EasySQL API accepts on
  * `POST /v1/connectors` and `POST /v1/connectors/:id/sync`.
  *
- * These mirror apps/api/src/db/schema.ts:connectors.schema_cache.
+ * Re-exported from @easysql/common so the CLI and the SDK share one
+ * contract. `ConnectorSchema`/`DatabaseType` are local aliases kept for
+ * compatibility with existing imports.
  */
 
-export interface ColumnSchema {
-	name: string;
-	type: string;
-	nullable: boolean;
-	primary_key?: boolean;
-	default?: string | null;
-	foreign_key?: { table: string; column: string } | null;
-}
+import type { ConnectorEngine, TableSchema } from "@easysql/common";
 
-export interface TableSchema {
-	name: string;
-	columns: ColumnSchema[];
-	rows_approx?: number | null;
-}
+export type {
+	ColumnSchema,
+	ConnectorEngine,
+	RawColumn,
+	RawSchema,
+	RawTable,
+	SchemaType,
+	TableSchema,
+} from "@easysql/common";
 
 export type ConnectorSchema = TableSchema[];
 
-export type DatabaseType = "mysql" | "mariadb" | "postgresql" | "sqlite";
+export type DatabaseType = ConnectorEngine;
 
 export interface ConnectorSummary {
 	id: string;

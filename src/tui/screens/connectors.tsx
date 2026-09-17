@@ -379,17 +379,25 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 				const isCursor = i === cursor;
 				const raw = form[field.id] ?? "";
 				const shown = field.secret ? "*".repeat(raw.length) : raw;
-				let value: string;
-				if (field.id === "type") value = `< ${raw} >`;
-				else if (field.id === "ssl") value = raw === "yes" ? "[x] required" : "[ ] disabled";
-				else value = shown.length > 0 ? shown : isCursor ? "▏" : "—";
-				return (
-					<Text key={field.id} color={isCursor ? "cyan" : undefined} bold={isCursor}>
-						{isCursor ? "› " : "  "}
-						{field.label.padEnd(22)}
-						{value}
-					</Text>
-				);
+		const editable = field.id !== "type" && field.id !== "ssl";
+		return (
+			<Text key={field.id} color={isCursor ? "cyan" : undefined} bold={isCursor}>
+				{isCursor ? "› " : "  "}
+				{field.label.padEnd(22)}
+				{field.id === "type" ? (
+					`< ${raw} >`
+				) : field.id === "ssl" ? (
+					raw === "yes" ? "[x] required" : "[ ] disabled"
+			) : shown.length === 0 ? (
+				<>{isCursor ? "▏" : "—"}</>
+			) : (
+					<>
+						{shown}
+						{isCursor && editable ? "▏" : ""}
+					</>
+				)}
+			</Text>
+		);
 			})}
 			<Text> </Text>
 			{status && <Text color="cyan">{status}</Text>}

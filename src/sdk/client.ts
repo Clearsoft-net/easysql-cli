@@ -1,11 +1,11 @@
 /**
- * Thin wrapper around @clearsoft/easysql-sdk. Centralizes:
+ * Thin wrapper around @easysql/client. Centralizes:
  *   - base URL resolution (CLI flag > env var > saved config > default)
  *   - error translation (openapi-fetch surfaces 4xx/5xx via {error} not throws)
  *   - lazy client construction (no SDK call before login)
  */
 
-import { createEasySQLClient } from "@clearsoft/easysql-sdk/dist/client.js";
+import { createEasySQLClient } from "@easysql/client";
 import { ApiError, NetworkError, NotLoggedInError } from "../cli/errors.js";
 import { DEFAULT_API_URL } from "../cli/global-options.js";
 import { loadConfig } from "../config/store.js";

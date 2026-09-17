@@ -40,6 +40,11 @@ chmod +x easysql && ./easysql --help
 
 Standalone binaries are published for `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64` and `windows-x64`.
 
+MySQL and PostgreSQL drivers are optional: SQLite works out of the box, and the
+other engines are installed on demand — `bun add @easysql/connector-mysql` or
+`bun add @easysql/connector-postgres`. Without the package, the CLI prints an
+install hint instead of a module-resolution error.
+
 ## Quick start
 
 ```bash

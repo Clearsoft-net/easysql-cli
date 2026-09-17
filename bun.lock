@@ -5,13 +5,13 @@
     "": {
       "name": "@clearsoft/easysql-cli",
       "dependencies": {
-        "@clearsoft/easysql-sdk": "^1.1.0",
+        "@easysql/client": "^2.0.0",
+        "@easysql/common": "^2.0.0",
+        "@easysql/connector-sqlite": "^2.0.0",
+        "@easysql/schema-generation": "^2.0.0",
         "chalk": "^5.3.0",
         "commander": "^12.1.0",
         "ink": "^7.1.1",
-        "mysql2": "^3.11.5",
-        "openapi-fetch": "^0.13.0",
-        "pg": "^8.13.1",
         "react": "^19.2.0",
         "react-devtools-core": "^7.0.1",
       },
@@ -19,12 +19,15 @@
         "@biomejs/biome": "2.5.12",
         "@types/bun": "^1.4.1",
         "@types/node": "^22.10.0",
-        "@types/pg": "^8.11.10",
         "@types/react": "^19.2.18",
         "@types/semver": "^7.5.8",
         "ink-testing-library": "^4.0.0",
         "semver": "^7.6.3",
         "typescript": "^5.7.0",
+      },
+      "optionalDependencies": {
+        "@easysql/connector-mysql": "^2.0.0",
+        "@easysql/connector-postgres": "^2.0.0",
       },
     },
   },
@@ -49,13 +52,21 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.12", "", { "os": "win32", "cpu": "x64" }, "sha512-B1R/l+CwEpKFSuqiwePzPNRk1EiJN8kc0UhdafNz6MZN9v5OFP9HYP1irptvWzHrwVI4blVNGMbxc5zt70m3IA=="],
 
-    "@clearsoft/easysql-sdk": ["@clearsoft/easysql-sdk@1.1.0", "", { "dependencies": { "openapi-fetch": "^0.13.0" } }, "sha512-X0sLgrm/RcmohRRt7EGG10lv9duiIt+WnVrQmgf8upCuOki9VrneF7y5mrxF1atJbTC1f0ULwHVwVxeurLrD6Q=="],
+    "@easysql/client": ["@easysql/client@2.0.0", "", { "dependencies": { "openapi-fetch": "^0.13.0" } }, "sha512-wq0nOZ1MxT5qvnQWXI80vq5v5cbDvEohGsQ/h5OaBuwEt642WZ9l0Q72e5xQBfsJZbmppRl7BZ/vk2rSUeS3mQ=="],
+
+    "@easysql/common": ["@easysql/common@2.0.0", "", {}, "sha512-akgPt4M8xsKC3RMjWhXUWyHCU7PorsjCPhKbwF8YaHHA0cMsMhawqEgqa0pv57n9Hql1GfiwQcu0bLaAkFCJ0g=="],
+
+    "@easysql/connector-mysql": ["@easysql/connector-mysql@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0", "mysql2": "^3.11.5" } }, "sha512-VYGVvUCujA+ZPqRiwXsQ8txhARg1do91qxSTj1sHA7r9UJLie1BEimimPCDJJ0lIzUNwsvCXYXeDkiEXetlXmw=="],
+
+    "@easysql/connector-postgres": ["@easysql/connector-postgres@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0", "pg": "^8.13.1" } }, "sha512-FEgG/TuxXn5JP5BcpAfQp9/WSxV+8hK6DzX9U9J7ozKeZBLSZapwobZ98RGOoMbwXXQ7xfXcjJ9O/73OeE3XJg=="],
+
+    "@easysql/connector-sqlite": ["@easysql/connector-sqlite@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0" } }, "sha512-ljcMn003Sl3s9vYzZ/LD6Pfdnmme2FoOoYidNfYqC5aIfRBn+nDOkPjiy4Uy/NQU+9eNud47aT9pqy4CyJkRRw=="],
+
+    "@easysql/schema-generation": ["@easysql/schema-generation@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0" } }, "sha512-V85QgFPLlYOCZEJzO4YeczbCySxaLgUXBUQVadB0JUYiCmJBJF+5aTVjK5bO0fJJ7RfH+aKv/mv3G90TkZdz7g=="],
 
     "@types/bun": ["@types/bun@1.4.1", "", { "dependencies": { "bun-types": "1.4.1" } }, "sha512-0AVGiTXGajf1rgKom3N+c5L7CBxuoyyv1i44M0nX4UDK0G/fnRAMiri93nHuVPIb429KKtAgj7HatVmmOjeQLA=="],
 
     "@types/node": ["@types/node@22.20.1", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q=="],
-
-    "@types/pg": ["@types/pg@8.23.1", "", { "dependencies": { "@types/node": "*", "pg-protocol": "*", "pg-types": "^2.2.0" } }, "sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A=="],
 
     "@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
 

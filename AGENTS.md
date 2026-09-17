@@ -112,6 +112,7 @@ src/
     └── sql-validator.ts        # validateSelectOnly() — defense in depth
 scripts/
 ├── build.ts                    # tsc OR bun --compile
+├── package-linux.ts            # deb/rpm packaging of the Linux binary (dpkg-deb/rpmbuild)
 ├── release-binaries.ts         # builds linux/darwin/windows x x64/arm64 → bin/easysql-*
 ├── tui-capture.ts              # dev: renders the TUI in a PTY (tmux) + --png screenshot
 └── tsconfig.json               # extends ../tsconfig.json, outDir=../dist
@@ -173,7 +174,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 ## Build & release pipeline
 
 - **CI** (`.github/workflows/ci.yml`): `bun install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build` → `build:compile` → `./bin/easysql --version` smoke.
-- **Release** (`.github/workflows/release.yml`): on a `v*.*.*` tag push or manual dispatch → guard `tag == package.json.version` → `check` + `test` + `scripts/release-binaries.ts` → `sha256sum bin/easysql-* > SHA256SUMS` → `softprops/action-gh-release@v2` publishes the 5 binaries + SHA256SUMS.
+- **Release** (`.github/workflows/release.yml`): on a `v*.*.*` tag push or manual dispatch → the `build` job (ubuntu-latest) guards `tag == package.json.version`, runs `check` + `test` + `scripts/release-binaries.ts`, builds the `amd64`/`x86_64` `.deb`/`.rpm` via `make packages ARCH=x64` and uploads `bin/*`; the `packages-arm64` job (native `ubuntu-24.04-arm`) builds the `arm64`/`aarch64` packages (cross-compiling RPM is rejected by `rpmbuild`, so a native runner is required); the `publish` job merges both artifacts, runs `sha256sum easysql-* easysql_* > SHA256SUMS`, and `softprops/action-gh-release@v2` publishes the 5 binaries + 4 packages (deb ×2, rpm ×2) + SHA256SUMS.
 - **Publish** (`.github/workflows/publish.yml`): same `v*.*.*` tag trigger → guard `tag == package.json.version` → skips if the version is already on npm → `npm publish --access public --provenance`. Auth is **Trusted Publishing (OIDC)** — no `NPM_TOKEN`; requires `id-token: write` and a Trusted Publisher configured on npmjs.com (owner `Clearsoft-net`, repo `easysql-cli`, workflow `publish.yml`).
 
 ## npm packaging
@@ -239,6 +240,8 @@ bun run check                   # biome + tsc --noEmit (lint+typecheck)
 bun test                        # 117 specs (sqlite + demo + TUI included)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
+make deb                        # .deb package for the host arch (ARCH=arm64 to cross-build)
+make rpm                        # .rpm package for the host arch (ARCH=arm64 to cross-build)
 ./bin/easysql --help            # smoke
 ```
 

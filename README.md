@@ -142,7 +142,13 @@ make build          # tsc → dist/
 make build-compile  # bun build --compile → bin/easysql (standalone binary)
 make test           # bun test
 make check          # biome + tsc --noEmit
+make deb            # .deb package → bin/easysql_<version>_<arch>.deb
+make rpm            # .rpm package → bin/easysql-<version>-<release>.<arch>.rpm
 ```
+
+`make deb` and `make rpm` package the standalone Linux binary for the host
+architecture (`ARCH=arm64` cross-builds the arm64 package). They need
+`dpkg-deb` and/or `rpmbuild` installed.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and conventions.
 

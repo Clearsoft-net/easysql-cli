@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+
+- `make deb` / `make rpm` (and `make packages`) to build `.deb` and `.rpm` packages of the standalone Linux binary via `scripts/package-linux.ts`. `ARCH=arm64` cross-builds for arm64.
+- The release workflow now attaches `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages to each GitHub Release (arm64 built on a native `ubuntu-24.04-arm` runner, since `rpmbuild` rejects cross-architecture builds).
+
 ## [0.3.1]
 
 ### Fixed

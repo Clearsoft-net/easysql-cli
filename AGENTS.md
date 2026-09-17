@@ -173,12 +173,14 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 ## Build & release pipeline
 
 - **CI** (`.github/workflows/ci.yml`): `bun install --frozen-lockfile` → `lint` → `typecheck` → `test` → `build` → `build:compile` → `./bin/easysql --version` smoke.
-- **Release** (`.github/workflows/release.yml`): on a `v*.*.*` tag push or manual dispatch → `check` + `test` + `scripts/release-binaries.ts` → `sha256sum bin/easysql-* > SHA256SUMS` → `softprops/action-gh-release@v2` publishes the 5 binaries + SHA256SUMS.
+- **Release** (`.github/workflows/release.yml`): on a `v*.*.*` tag push or manual dispatch → guard `tag == package.json.version` → `check` + `test` + `scripts/release-binaries.ts` → `sha256sum bin/easysql-* > SHA256SUMS` → `softprops/action-gh-release@v2` publishes the 5 binaries + SHA256SUMS.
+- **Publish** (`.github/workflows/publish.yml`): same `v*.*.*` tag trigger → guard `tag == package.json.version` → skips if the version is already on npm → `npm publish --access public --provenance`. Auth is **Trusted Publishing (OIDC)** — no `NPM_TOKEN`; requires `id-token: write` and a Trusted Publisher configured on npmjs.com (owner `Clearsoft-net`, repo `easysql-cli`, workflow `publish.yml`).
 
 ## npm packaging
 
 - The npm package ships **only `dist/`** (`package.json` `files`). The standalone binaries live on GitHub Releases, not in the npm tarball — a ~96 MB executable in the tarball would bloat installs and trip antivirus heuristics.
 - `prepublishOnly` runs `bun run build`, so `dist/` is always fresh at publish time.
+- Publishing is automated via `.github/workflows/publish.yml` (Trusted Publishing/OIDC, provenance). The **very first publish must be manual** (`npm login && npm publish --access public`) — npm requires the package to exist before a Trusted Publisher can be configured. After that, tags publish automatically.
 - The package is **runtime-portable**: `bin` shebang is `#!/usr/bin/env node`, and no `src/` file imports `bun:*`. `npx` / `npm i -g` (Node >=22.13) and `bunx` / `bun add -g` both work; the standalone binary is compiled with Bun and embeds its runtime.
 
 ## Code conventions

@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.4.0]
+
 ### Added
 
 - `make deb` / `make rpm` (and `make packages`) to build `.deb` and `.rpm` packages of the standalone Linux binary via `scripts/package-linux.ts`. `ARCH=arm64` cross-builds for arm64.
@@ -48,7 +50,8 @@ All notable changes to this project are documented here. The format is based on 
 - Standalone binaries for linux/darwin (x64, arm64) and windows-x64 via GitHub Releases.
 - Local SQL validator (defense in depth) and XDG-compliant storage with `0600` permissions.
 
-[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.2.0

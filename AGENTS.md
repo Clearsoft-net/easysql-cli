@@ -13,8 +13,8 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connecto
 - **Language:** TypeScript 5.7 (strict, `noUncheckedIndexedAccess`)
 - **Runtime:** Bun 1.3+ (engines: `bun >=1.1.0`, `node >=20`)
 - **CLI framework:** commander 12 + a hand-written help manual in `src/i18n/help.ts`
-- **HTTP SDK:** `@clearsoft/easysql-sdk` (openapi-fetch client)
-- **DB drivers:** `mysql2 ^3.11` + `pg ^8.13` + SQLite via `bun:sqlite` (built-in)
+- **HTTP SDK:** `@easysql/client ^2.0.0` (openapi-fetch client, modular org `@easysql/*`)
+- **DB layer:** `@easysql/connector-mysql` + `@easysql/connector-postgres` + `@easysql/connector-sqlite` (introspect + execute), `@easysql/schema-generation` (raw → API payload), contracts re-exported from `@easysql/common`
 - **Output:** `chalk 5` (auto-detect TTY), custom table renderer
 - **Lint/format:** Biome 2.5 (`biome.json`, tabs, 100 col, LF, double quotes)
 - **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` in dev) — running `easysql` with no subcommand opens React in the terminal
@@ -72,17 +72,15 @@ src/
 │   ├── store.ts                # loadConfig/saveConfig/clearConfig/isLoggedIn (0600)
 │   └── connectors-store.ts     # CRUD for local connectors (0600, no password)
 ├── db/
-│   ├── schema.ts               # ColumnSchema/TableSchema/ConnectorSchema types + DatabaseType
-│   ├── introspect.ts           # mysql/mariadb/postgresql/sqlite dispatcher
-│   ├── introspect-mysql.ts     # mysql2 + information_schema
-│   ├── introspect-postgres.ts  # pg + pg_catalog
-│   ├── introspect-sqlite.ts    # bun:sqlite + sqlite_master + PRAGMA
+│   ├── schema.ts               # re-exports ColumnSchema/TableSchema from @easysql/common + local aliases
+│   ├── introspect.ts           # dispatcher over @easysql/connector-* + generateSchema()
+│   ├── introspect-sqlite.ts    # thin SqliteConnector wrapper (kept for existing imports)
 │   ├── demo.ts                 # buildDemoDatabase() — sample customers/products/orders
-│   ├── parse-url.ts            # parseConnectionUrl() + mergeConnection() (sqlite:/// accepted)
+│   ├── parse-url.ts            # re-exports parseConnectionUrl()/mergeConnection() from @easysql/common
 │   ├── sync-connector.ts       # syncLocalConnector() — re-introspect + POST /sync
-│   └── execute.ts              # executeSelect() with validateSelectOnly() first
+│   └── execute.ts              # executeSelect() via @easysql/connector-*, validateSelectOnly() first
 ├── sdk/
-│   └── client.ts               # @clearsoft/easysql-sdk wrapper + resolveApiUrl()
+│   └── client.ts               # @easysql/client wrapper + resolveApiUrl()
 ├── i18n/
 │   ├── messages.ts             # UI strings (errors/prompts/success/info)
 │   └── help.ts                 # help manual (HELP_TOP/HELP_COMMANDS/HELP_DEMO/...)
@@ -155,13 +153,14 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 
 ## SDK — how the CLI consumes the API
 
-- `src/sdk/client.ts` is the only bridge to `@clearsoft/easysql-sdk`.
+- `src/sdk/client.ts` is the only bridge to `@easysql/client` (modular SDK v2).
 - `resolveApiUrl()`: `--api-url` > `$EASYSQL_API_URL` > saved config > `https://api.easysql.net`.
 - `getAuthenticatedClient(key, url)` returns an `AuthenticatedClient` (a hand-written interface mirroring the SDK).
 - `getSavedClient()`: throws `NotLoggedInError` if there is no config; used by `query`/`usage`/`connector`/`history`.
 - `login` validates by calling `me()` before persisting; 401/403 → invalid-key error.
 - `createQuery` returns `{id, sql_generated, needs_local_execution, status}`; `query.ts` reads `sql_generated`, executes locally, then calls `answerQuery` (POST `/v1/queries/:id/answer`) with `result_data: result.rows` so the API can generate the answer+chart.
-- `syncConnector` (as of SDK 1.1.0) now requires a `{schema: TableSchema[]}` body; `connector.ts:282` still rejects `--id` with an explicit error — that is the place to change when implementing sync-by-name.
+- `syncConnector` requires a `{schema: TableSchema[]}` body; `connector.ts:282` still rejects `--id` with an explicit error — that is the place to change when implementing sync-by-name.
+- DB work goes through the SDK too: `introspectDatabase()` opens the matching `@easysql/connector-*` class and maps raw → payload with `generateSchema()`; `executeSelect()` validates SELECT-only first, then delegates to `connector.execute()`. Schema/URL contracts come from `@easysql/common`. Connectors load lazily via `src/db/load-connector.ts` (`import()` per engine) — only the driver for the active connector type is loaded. `connector-mysql`/`connector-postgres` are `optionalDependencies` (install on demand with `bun add @easysql/connector-mysql`); a missing package surfaces as a `CliError` install hint, not a bare resolution error. `connector-sqlite` stays required (demo + default path).
 
 ## Self-update
 
@@ -225,7 +224,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 | Add a subcommand | `src/commands/<name>.ts` + register in `src/cli/program.ts` + entry in `src/i18n/help.ts` + manual in `commands/help.ts` |
 | Change UI text | `src/i18n/messages.ts` (`t()`) |
 | Change help text | `src/i18n/help.ts` + map in `src/commands/help.ts` |
-| Add a DB driver | `src/db/introspect-<name>.ts` + case in `src/db/introspect.ts` + `execute-<name>` in `src/db/execute.ts` |
+| Add a DB driver | new `@easysql/connector-*` dep + case in `openConnector()` in `src/db/introspect.ts` + `src/db/execute.ts` |
 | Add an API endpoint | `RawSdk` + `AuthenticatedClient` + `getAuthenticatedClient` in `src/sdk/client.ts` |
 | Change the persisted schema | `StoredConnector` in `src/config/connectors-store.ts` (migrate manually — no migration runner) |
 | Add a history entry | `HistoryEntry` in `src/history/store.ts` + write in `appendHistory` from the command |
@@ -250,4 +249,4 @@ make build-compile              # bun --compile → bin/easysql
 - Standalone binary `bin/easysql` already built (~92 MB).
 - `bin/` and `dist/` are in `.gitignore` — do not commit.
 - Public repo: https://github.com/Clearsoft-net/easysql-cli (branch `main`).
-- SDK: `@clearsoft/easysql-sdk` on npm, consumed via the semver dep `^1.1.0` (1.1.0 introduced `type: "sqlite"` in `ConnectorCreate`, renamed the SQL field from `sql` → `sql_generated`, and added `POST /v1/queries/:id/answer`).
+- SDK: modular `@easysql/*` v2.0.0 on npm (`client`, `common`, `schema-generation`, `connector-mysql/postgres/sqlite`), consumed via `^2.0.0`.

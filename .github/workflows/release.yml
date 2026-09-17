@@ -9,10 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  build-and-publish:
-    name: Build binaries & publish release
+  build:
+    name: Binaries & x64 packages
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -44,10 +44,67 @@ jobs:
       - name: Build platform binaries
         run: bun run scripts/release-binaries.ts
 
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Build .deb + .rpm (amd64 / x86_64)
+        run: make packages ARCH=x64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-x64
+          path: bin/*
+          if-no-files-found: error
+
+  packages-arm64:
+    name: arm64 packages
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Build .deb + .rpm (arm64 / aarch64)
+        run: make packages ARCH=arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-arm64
+          path: |
+            bin/easysql_*_arm64.deb
+            bin/easysql-*.rpm
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: [build, packages-arm64]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bin
+          merge-multiple: true
+
       - name: Generate checksums
         run: |
           cd bin
-          sha256sum easysql-* > SHA256SUMS
+          sha256sum easysql-* easysql_* > SHA256SUMS
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -60,6 +117,8 @@ jobs:
             bin/easysql-darwin-x64
             bin/easysql-darwin-arm64
             bin/easysql-windows-x64.exe
+            bin/easysql_*.deb
+            bin/easysql-*.rpm
             bin/SHA256SUMS
           body: |
             ## EasySQL CLI ${{ github.ref_name }}
@@ -70,12 +129,29 @@ jobs:
 
             ### Install
 
+            Standalone binary (Linux / macOS):
+
             ```bash
-            # Linux / macOS — pick the asset for your platform:
             curl -L https://github.com/Clearsoft-net/easysql-cli/releases/latest/download/easysql-linux-x64 -o easysql
             chmod +x ./easysql
             ./easysql --help
             ```
+
+            Debian / Ubuntu:
+
+            ```bash
+            curl -L https://github.com/Clearsoft-net/easysql-cli/releases/latest/download/easysql_<version>_amd64.deb -o easysql.deb
+            sudo apt install ./easysql.deb
+            ```
+
+            Fedora / RHEL:
+
+            ```bash
+            curl -L https://github.com/Clearsoft-net/easysql-cli/releases/latest/download/easysql-<version>-1.x86_64.rpm -o easysql.rpm
+            sudo dnf install ./easysql.rpm
+            ```
+
+            `arm64` / `aarch64` packages are also attached for Linux on ARM.
 
             ### Checksums
             See `SHA256SUMS` attached to this release.

@@ -5,11 +5,12 @@
 # ---------------------------------------------------------------------------
 BIN_DIR       := bin
 CLI_BIN       := $(BIN_DIR)/easysql
+ARCH          ?= $(shell uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')
 
 # ---------------------------------------------------------------------------
 # .PHONY targets (strictly alphabetical)
 # ---------------------------------------------------------------------------
-.PHONY: build build-compile check clean help install lint lint-fix release-binaries run test test-watch typecheck
+.PHONY: build build-compile check clean deb help install lint lint-fix packages release-binaries rpm run test test-watch typecheck
 
 # ---------------------------------------------------------------------------
 # help (default) — auto-generated menu
@@ -56,8 +57,16 @@ test-watch: ## Run tests in watch mode
 # ---------------------------------------------------------------------------
 # Distribution
 # ---------------------------------------------------------------------------
+deb: ## Build a .deb package for the host architecture (ARCH=arm64 to cross-build)
+	bun run scripts/package-linux.ts --format deb --arch $(ARCH)
+
+packages: deb rpm ## Build both the .deb and .rpm packages
+
 release-binaries: ## Build binaries for all platforms (linux/darwin x x64/arm64)
 	bun run scripts/release-binaries.ts
+
+rpm: ## Build a .rpm package for the host architecture (ARCH=arm64 to cross-build)
+	bun run scripts/package-linux.ts --format rpm --arch $(ARCH)
 
 # ---------------------------------------------------------------------------
 # Run

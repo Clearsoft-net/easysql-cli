@@ -1,11 +1,11 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 /**
  * Binary entrypoint — minimal wrapper that calls run() with process.argv.
  *
- * Note: when the binary is built with `bun build --compile`, the resulting
- * executable embeds the Bun runtime and prepends ["bun", "<embedded-path>"]
- * to argv. We detect that and slice the actual user args from argv.
+ * Runs on Node >=22.13 (node:sqlite) and on Bun >=1.4. When compiled with
+ * `bun build --compile`, the executable embeds the Bun runtime and prepends
+ * ["bun", "<embedded-path>"] to argv; we detect that and slice the real args.
  */
 
 import { userArgs } from "./cli/user-args.js";

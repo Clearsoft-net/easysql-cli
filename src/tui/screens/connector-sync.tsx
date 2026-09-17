@@ -81,12 +81,22 @@ export function ConnectorSync({ connector, title = "Sync connector", onExit }: P
 			<Text bold color="cyan">
 				{title}: {connector.name}
 			</Text>
-			{needsPassword && !done && (
-				<Text>
-					Password: {"*".repeat(password.length)}
-					{!busy && <Text color="cyan">▏</Text>}
-				</Text>
-			)}
+		{needsPassword && !done && (
+			<Text>
+				Password:{" "}
+				{password.length === 0 ? (
+					<>
+						{!busy && <Text color="cyan">▏</Text>}
+						<Text dimColor>type the password…</Text>
+					</>
+				) : (
+					<>
+						{"*".repeat(password.length)}
+						{!busy && <Text color="cyan">▏</Text>}
+					</>
+				)}
+			</Text>
+		)}
 			{status && <Text color="cyan">{status}</Text>}
 			{error && <Text color="red">Error: {error}</Text>}
 			<Text dimColor>

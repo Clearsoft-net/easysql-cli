@@ -147,6 +147,7 @@ export function QuestionScreen({
 	const [slashHint, setSlashHint] = useState<string | null>(null);
 	const [slashSel, setSlashSel] = useState(0);
 	const [status, setStatus] = useState<Status>("idle");
+	const [asked, setAsked] = useState<string | null>(null);
 	const [sql, setSql] = useState<string | null>(null);
 	const [result, setResult] = useState<LocalQueryResult | null>(null);
 	const [err, setErr] = useState<string | null>(null);
@@ -189,14 +190,15 @@ export function QuestionScreen({
 						setSlashBuf(null);
 						setSlashHint(null);
 						return;
-					case "clear":
-						setBuf("");
-						setSql(null);
-						setResult(null);
-						setErr(null);
-						setSlashBuf(null);
-						setSlashHint(null);
-						return;
+				case "clear":
+					setBuf("");
+					setAsked(null);
+					setSql(null);
+					setResult(null);
+					setErr(null);
+					setSlashBuf(null);
+					setSlashHint(null);
+					return;
 					case "sync": {
 						const target = findConnectorByName(connector);
 						if (!target) {
@@ -291,6 +293,7 @@ export function QuestionScreen({
 		setErr(null);
 		setResult(null);
 		setSql(null);
+		setAsked(question);
 		setBuf("");
 		try {
 			setStatus("generating");
@@ -343,7 +346,7 @@ export function QuestionScreen({
 		}
 	}
 
-	const showWelcome = status === "idle" && !result && !sql && buf.length === 0;
+	const showWelcome = status === "idle" && !result && !sql && !asked && buf.length === 0;
 	const slashMatches = slashBuf === null ? [] : filterCommands(slashBuf.slice(1));
 	const slashSelClamped =
 		slashMatches.length === 0 ? 0 : Math.min(slashSel, slashMatches.length - 1);
@@ -361,13 +364,20 @@ export function QuestionScreen({
 						</Box>
 					)}
 
-					<Box marginTop={1} flexDirection="column">
-						{status === "generating" && <Spinner label="Generating SQL…" />}
-						{status === "executing" && <Spinner label="Executing locally…" />}
-						{err && <Text color="red">Error: {err}</Text>}
-					</Box>
+				<Box marginTop={1} flexDirection="column">
+					{status === "generating" && <Spinner label="Generating SQL…" />}
+					{status === "executing" && <Spinner label="Executing locally…" />}
+					{err && <Text color="red">Error: {err}</Text>}
+				</Box>
 
-					{result && (
+				{asked && (status === "generating" || status === "executing" || result || sql) && (
+					<Box marginTop={1} flexDirection="column">
+						<Text dimColor>Question</Text>
+						<Text bold>{asked}</Text>
+					</Box>
+				)}
+
+				{result && (
 						<Box marginTop={1} flexDirection="column">
 							<Text dimColor>
 								{result.row_count} row(s) in {result.duration_ms}ms
@@ -417,18 +427,23 @@ export function QuestionScreen({
 							})}
 						</Box>
 					)}
-					<Box borderStyle="round" borderColor="magenta" paddingX={1}>
-						<Text color="magenta">/</Text>
-						<Text>
-							{" "}
-							{slashBuf.slice(1).length === 0 ? (
+				<Box borderStyle="round" borderColor="magenta" paddingX={1}>
+					<Text color="magenta">/</Text>
+					<Text>
+						{" "}
+						{slashBuf.slice(1).length === 0 ? (
+							<>
+								<Cursor color="magenta" />
 								<Text dimColor>type a command…</Text>
-							) : (
-								slashBuf.slice(1)
-							)}
-						</Text>
-						<Cursor color="magenta" />
-					</Box>
+							</>
+						) : (
+							<>
+								{slashBuf.slice(1)}
+								<Cursor color="magenta" />
+							</>
+						)}
+					</Text>
+				</Box>
 					{slashMatches.length === 0 ? (
 						<Text color="yellow"> No matching command · Esc to cancel</Text>
 					) : (
@@ -437,11 +452,23 @@ export function QuestionScreen({
 					{slashHint && <Text color="yellow"> {slashHint}</Text>}
 				</Box>
 			) : (
-				<Box borderStyle="round" borderColor="green" paddingX={1}>
-					<Text color="green">›</Text>
-					<Text> {buf.length === 0 ? <Text dimColor>(type a question, hit Enter · / for commands)</Text> : buf}</Text>
-					<Cursor />
-				</Box>
+			<Box borderStyle="round" borderColor="green" paddingX={1}>
+				<Text color="green">›</Text>
+				<Text>
+					{" "}
+					{buf.length === 0 ? (
+						<>
+							<Cursor />
+							<Text dimColor>(type a question, hit Enter · / for commands)</Text>
+						</>
+					) : (
+						<>
+							{buf}
+							<Cursor />
+						</>
+					)}
+				</Text>
+			</Box>
 			)}
 		</Box>
 	);

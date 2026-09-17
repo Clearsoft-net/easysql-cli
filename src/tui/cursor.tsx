@@ -1,6 +1,7 @@
 /**
- * Blinking block cursor shown at the end of a focused text input, so the
- * user can tell which field is selected.
+ * Blinking block cursor for a focused text input. Render it before the
+ * placeholder when the buffer is empty, after the text once the user
+ * starts typing.
  */
 
 import { Text } from "ink";

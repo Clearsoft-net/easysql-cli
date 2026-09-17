@@ -1,17 +1,18 @@
 /**
  * Demo SQLite database — generates a small fictional sample database
- * (3-4 tables) using Bun's built-in bun:sqlite module. Idempotent: the
- * existing file is removed before regeneration so a re-run resets the
- * data deterministically. Intended for `easysql demo`, which registers
- * the resulting file as a local connector named `local-demo`.
+ * (3-4 tables) using Node's built-in node:sqlite module (Node >=22.13 /
+ * Bun >=1.4). Idempotent: the existing file is removed before regeneration
+ * so a re-run resets the data deterministically. Intended for
+ * `easysql demo`, which registers the resulting file as a local connector
+ * named `local-demo`.
  *
  * The schema is designed to look like a small e-commerce / product
  * catalog so the natural-language queries feel realistic.
  */
 
-import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 export const DEMO_CONNECTOR_NAME = "local-demo";
 
@@ -35,7 +36,7 @@ export function buildDemoDatabase(opts: DemoOptions): DemoResult {
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
 	if (existsSync(file)) rmSync(file);
 
-	const db = new Database(file);
+	const db = new DatabaseSync(file);
 	try {
 		db.exec(`
 			PRAGMA foreign_keys = ON;

@@ -22,7 +22,7 @@ bun install --frozen-lockfile
 ```bash
 bun run dev         # run the CLI from source (not the TUI; use src/bin.ts for that)
 bun run check       # Biome + tsc --noEmit (must be clean before opening a PR)
-bun test            # 117 specs
+bun test            # 120 specs
 bun run test:watch  # watch mode
 ```
 
@@ -56,6 +56,14 @@ make build-compile  # bun build --compile → bin/easysql
 - Before opening a PR: `bun run check` and `bun test` must both pass.
 - Describe the change, the motivation, and how you verified it. Attach a TUI screenshot when the change is visual (`bun run scripts/tui-capture.ts --png out.png`).
 - CI runs lint, typecheck, tests, build and a compiled-binary smoke test on every push/PR to `main`.
+
+## Releasing
+
+1. Bump `version` in `package.json` and move the `Unreleased` notes in `CHANGELOG.md` under the new version.
+2. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. The tag triggers two workflows: `release.yml` (standalone binaries + GitHub Release) and `publish.yml` (npm). Both fail if the tag does not match `package.json.version`, and `publish.yml` skips versions already on npm.
+
+npm publishing uses **Trusted Publishing (OIDC)** — there is no `NPM_TOKEN` secret. One-time setup on npmjs.com: open the package's settings → *Trusted Publisher* → GitHub Actions, with owner `Clearsoft-net`, repository `easysql-cli` and workflow `publish.yml`. The **first publish must be done manually** (`npm login && npm publish --access public`), because npm requires the package to exist before a Trusted Publisher can be configured.
 
 ## Reporting bugs
 

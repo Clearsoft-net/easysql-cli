@@ -16,7 +16,7 @@ We aim to acknowledge reports within a few business days.
 
 ## Scope
 
-This repository covers the open-source `easysql-cli` (the npm package `@clearsoft/easysql-cli` and the standalone GitHub Releases binaries). The EasySQL API and dashboard are out of scope here.
+This repository covers the open-source `easysql-cli` (the npm package `@easysql/cli` and the standalone GitHub Releases binaries). The EasySQL API and dashboard are out of scope here.
 
 ## Security model
 

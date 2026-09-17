@@ -7,7 +7,7 @@ describe("version", () => {
 	});
 
 	it("exports the correct package name", () => {
-		expect(NAME).toBe("@clearsoft/easysql-cli");
+		expect(NAME).toBe("@easysql/cli");
 	});
 
 	it("exports the GitHub repo path", () => {

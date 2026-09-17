@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/Clearsoft-net/easysql-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Clearsoft-net/easysql-cli/ci.yml?branch=main&style=flat-square" alt="CI Status"></a>
-  <a href="https://www.npmjs.com/package/@clearsoft/easysql-cli"><img src="https://img.shields.io/npm/v/@clearsoft/easysql-cli?color=F97316&style=flat-square" alt="NPM Version"></a>
+  <a href="https://www.npmjs.com/package/@easysql/cli"><img src="https://img.shields.io/npm/v/@easysql/cli?color=F97316&style=flat-square" alt="NPM Version"></a>
   <a href="https://github.com/Clearsoft-net/easysql-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"></a>
   <a href="https://easysql.net"><img src="https://img.shields.io/badge/Product-easysql.net-F97316?style=flat-square" alt="Website"></a>
   <a href="https://clearsoft.net"><img src="https://img.shields.io/badge/Company-clearsoft.net-0F2B3D?style=flat-square" alt="Company"></a>
@@ -45,10 +45,10 @@ Because of this, `bunx` and `bun add -g` work, while `npx` / `npm i -g` only wor
 
 ```bash
 # Run without installing
-bunx @clearsoft/easysql-cli
+bunx @easysql/cli
 
 # Or install globally
-bun add -g @clearsoft/easysql-cli
+bun add -g @easysql/cli
 
 # Or grab a standalone binary from GitHub Releases (no Bun required)
 curl -L https://github.com/Clearsoft-net/easysql-cli/releases/latest/download/easysql-linux-x64 -o easysql

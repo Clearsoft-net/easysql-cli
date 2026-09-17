@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@clearsoft/easysql-cli",
+      "name": "@easysql/cli",
       "dependencies": {
         "@easysql/client": "^2.0.0",
         "@easysql/common": "^2.0.0",

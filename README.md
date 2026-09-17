@@ -34,23 +34,25 @@ The **EasySQL CLI** is the open-source counterpart to the WordPress plugin. It r
 
 ## Requirements
 
-The CLI is **Bun-only**: it uses `bun:sqlite` and the binary shebang is `#!/usr/bin/env bun`. Node.js alone cannot run it.
+Runs on **Node.js >= 22.13** (built-in `node:sqlite`) or **Bun >= 1.4**.
 
-- [Bun](https://bun.sh) >= 1.4 — to run the npm package.
+- [Node.js](https://nodejs.org) >= 22.13, or [Bun](https://bun.sh) >= 1.4 — to run the npm package.
 - Or no runtime at all — grab a standalone binary from GitHub Releases.
 
-Because of this, `bunx` and `bun add -g` work, while `npx` / `npm i -g` only work if Bun is on your `PATH`.
+Both `npx` / `npm i -g` and `bunx` / `bun add -g` work.
 
 ## Install
 
 ```bash
 # Run without installing
+npx @easysql/cli
 bunx @easysql/cli
 
 # Or install globally
+npm i -g @easysql/cli
 bun add -g @easysql/cli
 
-# Or grab a standalone binary from GitHub Releases (no Bun required)
+# Or grab a standalone binary from GitHub Releases (no runtime required)
 curl -L https://github.com/Clearsoft-net/easysql-cli/releases/latest/download/easysql-linux-x64 -o easysql
 chmod +x easysql && ./easysql --help
 ```
@@ -58,9 +60,9 @@ chmod +x easysql && ./easysql --help
 Standalone binaries are published for `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64` and `windows-x64`.
 
 MySQL and PostgreSQL drivers are optional: SQLite works out of the box, and the
-other engines are installed on demand — `bun add @easysql/connector-mysql` or
-`bun add @easysql/connector-postgres`. Without the package, the CLI prints an
-install hint instead of a module-resolution error.
+other engines are installed on demand — `npm i @easysql/connector-mysql`,
+`bun add @easysql/connector-postgres`, etc. Without the package, the CLI prints
+an install hint instead of a module-resolution error.
 
 ## Quick start
 

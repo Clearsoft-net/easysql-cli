@@ -4,8 +4,9 @@ Thanks for your interest in improving the EasySQL CLI. This document covers the 
 
 ## Requirements
 
-- [Bun](https://bun.sh) >= 1.4
+- [Bun](https://bun.sh) >= 1.4 — test runner, bundler and `bun install`.
 - `git`
+- (Optional) [Node.js](https://nodejs.org) >= 22.13, to run the built CLI without Bun.
 - (Optional) `tmux` + a Chrome/Chromium binary, to capture the TUI with `scripts/tui-capture.ts`
 
 ## Setup

@@ -11,7 +11,7 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connecto
 ## Stack
 
 - **Language:** TypeScript 5.7 (strict, `noUncheckedIndexedAccess`)
-- **Runtime:** Bun 1.4+ (engines: `bun >=1.4.0`, `node >=20`)
+- **Runtime:** Node >=22.13 or Bun >=1.4 (engines: `bun >=1.4.0`, `node >=22.13.0`); `node:sqlite` powers `demo` + the sqlite connector
 - **CLI framework:** commander 12 + a hand-written help manual in `src/i18n/help.ts`
 - **HTTP SDK:** `@easysql/client ^2.0.0` (openapi-fetch client, modular org `@easysql/*`)
 - **DB layer:** `@easysql/connector-mysql` + `@easysql/connector-postgres` + `@easysql/connector-sqlite` (introspect + execute), `@easysql/schema-generation` (raw → API payload), contracts re-exported from `@easysql/common`
@@ -179,7 +179,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 
 - The npm package ships **only `dist/`** (`package.json` `files`). The standalone binaries live on GitHub Releases, not in the npm tarball — a ~96 MB executable in the tarball would bloat installs and trip antivirus heuristics.
 - `prepublishOnly` runs `bun run build`, so `dist/` is always fresh at publish time.
-- The package is **Bun-only**: it imports `bun:sqlite` and the `bin` shebang is `#!/usr/bin/env bun`. `bunx` / `bun add -g` work; `npx` / `npm i -g` only work if Bun is on `PATH`.
+- The package is **runtime-portable**: `bin` shebang is `#!/usr/bin/env node`, and no `src/` file imports `bun:*`. `npx` / `npm i -g` (Node >=22.13) and `bunx` / `bun add -g` both work; the standalone binary is compiled with Bun and embeds its runtime.
 
 ## Code conventions
 

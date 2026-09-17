@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Changed
+
+- The CLI now runs on Node.js >= 22.13 as well as Bun >= 1.4 — `demo` uses `node:sqlite` and the `bin` shebang is `#!/usr/bin/env node`.
+- Renamed the npm package to `@easysql/cli`.
+
 ## [0.2.0]
 
 ### Changed

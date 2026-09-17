@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.3.1]
+
+### Fixed
+
+- Subcommands are recognized again when the CLI is launched through the npm bin shim (`npx @easysql/cli`, global install): the extensionless `node_modules/.bin/easysql` path was leaking into commander and shifting the arguments.
+
 ## [0.3.0]
 
 ### Changed
@@ -37,7 +43,8 @@ All notable changes to this project are documented here. The format is based on 
 - Standalone binaries for linux/darwin (x64, arm64) and windows-x64 via GitHub Releases.
 - Local SQL validator (defense in depth) and XDG-compliant storage with `0600` permissions.
 
-[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.1.0

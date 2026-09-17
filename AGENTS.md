@@ -11,7 +11,7 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connecto
 ## Stack
 
 - **Language:** TypeScript 5.7 (strict, `noUncheckedIndexedAccess`)
-- **Runtime:** Bun 1.3+ (engines: `bun >=1.1.0`, `node >=20`)
+- **Runtime:** Bun 1.4+ (engines: `bun >=1.4.0`, `node >=20`)
 - **CLI framework:** commander 12 + a hand-written help manual in `src/i18n/help.ts`
 - **HTTP SDK:** `@easysql/client ^2.0.0` (openapi-fetch client, modular org `@easysql/*`)
 - **DB layer:** `@easysql/connector-mysql` + `@easysql/connector-postgres` + `@easysql/connector-sqlite` (introspect + execute), `@easysql/schema-generation` (raw → API payload), contracts re-exported from `@easysql/common`

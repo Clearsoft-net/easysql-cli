@@ -4,7 +4,7 @@ Thanks for your interest in improving the EasySQL CLI. This document covers the 
 
 ## Requirements
 
-- [Bun](https://bun.sh) >= 1.1
+- [Bun](https://bun.sh) >= 1.4
 - `git`
 - (Optional) `tmux` + a Chrome/Chromium binary, to capture the TUI with `scripts/tui-capture.ts`
 

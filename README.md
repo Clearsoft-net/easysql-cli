@@ -19,7 +19,7 @@ The **EasySQL CLI** is the open-source counterpart to the WordPress plugin. It r
 
 The CLI is **Bun-only**: it uses `bun:sqlite` and the binary shebang is `#!/usr/bin/env bun`. Node.js alone cannot run it.
 
-- [Bun](https://bun.sh) >= 1.1 — to run the npm package.
+- [Bun](https://bun.sh) >= 1.4 — to run the npm package.
 - Or no runtime at all — grab a standalone binary from GitHub Releases.
 
 Because of this, `bunx` and `bun add -g` work, while `npx` / `npm i -g` only work if Bun is on your `PATH`.

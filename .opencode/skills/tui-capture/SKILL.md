@@ -112,7 +112,7 @@ Sempre encerre a sessão ao terminar; `--keep` só existe para inspeção manual
 - **Question:** qualquer texto entra no buffer · `Enter` submete · `Backspace`
   apaga · `?` e números são literais (não atalhos).
 - **Slash (dentro da Question):** digitar `/` abre um **dropdown filtrável** de
-  comandos (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/quit`).
+  comandos (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`).
   Digitar filtra; `↑`/`↓` (`$Up`/`$Down`) navegam a seleção; `Enter` executa;
   `Esc` cancela; `Backspace` edita. Aliases continuam aceitos ao digitar
   (`/c`,`/1` connectors; `/h2`,`/2` history; `/q2`,`/3` question; `/cls` clear).

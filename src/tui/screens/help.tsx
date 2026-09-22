@@ -17,7 +17,8 @@ export function HelpScreen() {
 			</Text>
 			<Text>
 				<Text color="cyan">[/]</Text> Slash-commands: <Text color="cyan">/help</Text>, <Text color="cyan">/quit</Text>,{" "}
-				<Text color="cyan">/connectors</Text>, <Text color="cyan">/history</Text>, <Text color="cyan">/clear</Text>
+				<Text color="cyan">/connectors</Text>, <Text color="cyan">/history</Text>, <Text color="cyan">/clear</Text>,{" "}
+				<Text color="cyan">/login</Text>, <Text color="cyan">/logout</Text>
 			</Text>
 			<Text>
 				<Text color="cyan">[Esc]</Text> Close slash-prompt / help

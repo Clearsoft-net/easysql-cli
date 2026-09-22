@@ -15,6 +15,8 @@
  *   /history          — switch to History
  *   /question         — switch to Question (no-op)
  *   /clear            — clear the buffer + result panel
+ *   /logout           — clear stored credentials (log in again with `easysql login`)
+ *   /login            — prompt for an API key and sign in without leaving the TUI
  *   /<anything-else>  — unknown command, stays in slash mode with a hint
  *
  * Errors are surfaced as inline text (no console.log side-effects).
@@ -29,7 +31,8 @@ import {
 } from "../../config/connectors-store.js";
 import { executeSelect, type LocalQueryResult } from "../../db/execute.js";
 import { appendHistory } from "../../history/store.js";
-import { getSavedClient } from "../../sdk/client.js";
+import { t } from "../../i18n/messages.js";
+import { getSavedClient, isConnectorNotFoundError } from "../../sdk/client.js";
 import { promptSecret } from "../../util/prompt.js";
 import type { ScreenName } from "../app.js";
 import { Cursor } from "../cursor.js";
@@ -37,6 +40,7 @@ import { ResultTable } from "../result-table.js";
 import { Spinner } from "../spinner.js";
 import { SqlText } from "../sql-highlight.js";
 import { ConnectorSync } from "./connector-sync.js";
+import { LoginScreen, type LoggedInUser } from "./login.js";
 import { UsageView } from "./usage.js";
 
 type Status = "idle" | "generating" | "executing" | "ok" | "error";
@@ -47,6 +51,8 @@ interface Props {
 	onSwitchScreen?: (s: ScreenName) => void;
 	onOpenHelp?: () => void;
 	onQuit?: () => void;
+	onLogout?: () => boolean;
+	onLoggedIn?: (user: LoggedInUser) => void;
 }
 
 interface QueryResponse {
@@ -70,7 +76,9 @@ type SlashCmd =
 	| { kind: "screen"; screen: ScreenName }
 	| { kind: "clear" }
 	| { kind: "sync" }
-	| { kind: "usage" };
+	| { kind: "usage" }
+	| { kind: "logout" }
+	| { kind: "login" };
 
 function parseSlash(cmd: string): SlashCmd | { kind: "unknown"; raw: string } {
 	const lower = cmd.trim().toLowerCase();
@@ -105,6 +113,12 @@ function parseSlash(cmd: string): SlashCmd | { kind: "unknown"; raw: string } {
 		case "usage":
 		case "u":
 			return { kind: "usage" };
+		case "logout":
+		case "lo":
+			return { kind: "logout" };
+		case "login":
+		case "li":
+			return { kind: "login" };
 		default:
 			return { kind: "unknown", raw: cmd };
 	}
@@ -124,6 +138,8 @@ const SLASH_COMMANDS: SlashCommand[] = [
 	{ name: "clear", aliases: ["cls"], desc: "Clear buffer and result" },
 	{ name: "sync", aliases: ["sy"], desc: "Sync the active connector" },
 	{ name: "usage", aliases: ["u"], desc: "Show plan usage/quota" },
+	{ name: "logout", aliases: ["lo"], desc: "Log out (clear credentials)" },
+	{ name: "login", aliases: ["li"], desc: "Log in with an API key" },
 	{ name: "quit", aliases: ["q", "exit"], desc: "Quit the TUI" },
 ];
 
@@ -141,6 +157,8 @@ export function QuestionScreen({
 	onSwitchScreen,
 	onOpenHelp,
 	onQuit,
+	onLogout,
+	onLoggedIn,
 }: Props) {
 	const [buf, setBuf] = useState("");
 	const [slashBuf, setSlashBuf] = useState<string | null>(null);
@@ -151,16 +169,18 @@ export function QuestionScreen({
 	const [sql, setSql] = useState<string | null>(null);
 	const [result, setResult] = useState<LocalQueryResult | null>(null);
 	const [err, setErr] = useState<string | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [syncTarget, setSyncTarget] = useState<StoredConnector | null>(null);
 	const [usageOpen, setUsageOpen] = useState(false);
+	const [loginOpen, setLoginOpen] = useState(false);
 
 	useEffect(() => {
-		onBusyChange?.(busy);
-	}, [busy, onBusyChange]);
+		onBusyChange?.(busy || loginOpen);
+	}, [busy, loginOpen, onBusyChange]);
 
 	useInput((input, key) => {
-		if (syncTarget || usageOpen) return;
+		if (syncTarget || usageOpen || loginOpen) return;
 		if (busy) return;
 
 		// Slash-command mode.
@@ -196,6 +216,7 @@ export function QuestionScreen({
 					setSql(null);
 					setResult(null);
 					setErr(null);
+					setNotice(null);
 					setSlashBuf(null);
 					setSlashHint(null);
 					return;
@@ -212,6 +233,22 @@ export function QuestionScreen({
 					}
 					case "usage":
 						setUsageOpen(true);
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
+					case "logout": {
+						const cleared = onLogout?.() ?? false;
+						setNotice(
+							cleared
+								? "Logged out. Run `easysql login` to sign in as another user."
+								: "Could not clear stored credentials.",
+						);
+						setSlashBuf(null);
+						setSlashHint(null);
+						return;
+					}
+					case "login":
+						setLoginOpen(true);
 						setSlashBuf(null);
 						setSlashHint(null);
 						return;
@@ -291,6 +328,7 @@ export function QuestionScreen({
 		}
 		setBusy(true);
 		setErr(null);
+		setNotice(null);
 		setResult(null);
 		setSql(null);
 		setAsked(question);
@@ -339,7 +377,11 @@ export function QuestionScreen({
 				status: "ok",
 			});
 		} catch (e) {
-			setErr(e instanceof Error ? e.message : String(e));
+			if (isConnectorNotFoundError(e)) {
+				setErr(t().errors.connectorNotFoundOnApi(stored.name));
+			} else {
+				setErr(e instanceof Error ? e.message : String(e));
+			}
 			setStatus("error");
 		} finally {
 			setBusy(false);
@@ -368,6 +410,7 @@ export function QuestionScreen({
 					{status === "generating" && <Spinner label="Generating SQL…" />}
 					{status === "executing" && <Spinner label="Executing locally…" />}
 					{err && <Text color="red">Error: {err}</Text>}
+					{notice && <Text color="yellow">{notice}</Text>}
 				</Box>
 
 				{asked && (status === "generating" || status === "executing" || result || sql) && (
@@ -397,7 +440,12 @@ export function QuestionScreen({
 				<Box flexGrow={1} />
 			)}
 
-			{usageOpen ? (
+			{loginOpen ? (
+				<LoginScreen
+					onExit={() => setLoginOpen(false)}
+					onSuccess={(user) => onLoggedIn?.(user)}
+				/>
+			) : usageOpen ? (
 				<UsageView onExit={() => setUsageOpen(false)} />
 			) : syncTarget ? (
 				<ConnectorSync

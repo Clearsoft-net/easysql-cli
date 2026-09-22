@@ -40,6 +40,47 @@ function isHttpErrorLike(e: unknown): { status?: number; message?: string } | nu
 	return out;
 }
 
+/**
+ * Extracts a human-readable message from an openapi-fetch error body. The
+ * API is FastAPI, which reports errors as `{detail: "..."}`; some paths use
+ * `message`/`error`, and non-JSON bodies arrive as a plain string.
+ */
+function errorBodyMessage(body: unknown): string | undefined {
+	if (typeof body === "string" && body.length > 0) return body;
+	if (!body || typeof body !== "object") return undefined;
+	const obj = body as Record<string, unknown>;
+	for (const key of ["message", "detail", "error", "error_description"]) {
+		const v = obj[key];
+		if (typeof v === "string" && v.length > 0) return v;
+	}
+	return undefined;
+}
+
+/**
+ * Maps an openapi-fetch result to an ApiError. openapi-fetch does not throw
+ * on HTTP errors: it returns the parsed body in `error` and the response in
+ * `response`, so the status must come from `response.status` — otherwise a
+ * 404 becomes "API error (0): unknown error".
+ */
+export function apiErrorFromResult(result: {
+	error?: unknown;
+	response?: { status?: number };
+}): ApiError {
+	const status = result.response?.status ?? 0;
+	const message = errorBodyMessage(result.error) ?? "request failed";
+	return new ApiError(status, message);
+}
+
+/**
+ * True when the API reports that the connector referenced by the request does
+ * not exist for the authenticated user. This happens when the local
+ * `connectors.json` still holds a connector id from a previous account (the
+ * store is not scoped per user), and it needs an explicit re-registration.
+ */
+export function isConnectorNotFoundError(err: unknown): boolean {
+	return err instanceof ApiError && err.status === 404 && /connector/i.test(err.message);
+}
+
 async function call<T>(fn: () => Promise<SdkResult<T>>): Promise<T> {
 	let result: SdkResult<T>;
 	try {
@@ -56,13 +97,10 @@ async function call<T>(fn: () => Promise<SdkResult<T>>): Promise<T> {
 		throw new ApiError(0, msg);
 	}
 	if (result.error) {
-		const e = isHttpErrorLike(result.error);
-		if (e?.status !== undefined) {
-			throw new ApiError(e.status, e.message ?? "request failed");
-		}
-		throw new ApiError(0, e?.message ?? "unknown error");
+		throw apiErrorFromResult(result);
 	}
 	if (result.data === undefined) {
+		if (result.response && !result.response.ok) throw apiErrorFromResult(result);
 		throw new ApiError(0, "empty response");
 	}
 	return result.data;
@@ -85,11 +123,7 @@ async function callVoid(fn: () => Promise<SdkResult<unknown>>): Promise<void> {
 		throw new ApiError(0, msg);
 	}
 	if (result.error) {
-		const e = isHttpErrorLike(result.error);
-		if (e?.status !== undefined) {
-			throw new ApiError(e.status, e.message ?? "request failed");
-		}
-		throw new ApiError(0, e?.message ?? "unknown error");
+		throw apiErrorFromResult(result);
 	}
 }
 

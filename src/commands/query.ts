@@ -17,7 +17,7 @@ import { appendHistory } from "../history/store.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
 import { renderResult } from "../output/table.js";
-import { getSavedClient } from "../sdk/client.js";
+import { getSavedClient, isConnectorNotFoundError } from "../sdk/client.js";
 import { promptLine } from "../util/prompt.js";
 
 interface QueryOptions {
@@ -85,17 +85,25 @@ export function registerQuery(program: Command): void {
 			const connector = await pickConnector(opts.connector);
 
 			printInfo(t().info.generatingSql);
-			const createRes = (await client.createQuery({
-				connector_id: connector.id,
-				question,
-				rows_limit: opts.rows,
-			})) as {
+			let createRes: {
 				id?: string;
 				sql?: string;
 				sql_generated?: string | null;
 				needs_local_execution?: boolean;
 				status?: string;
 			};
+			try {
+				createRes = (await client.createQuery({
+					connector_id: connector.id,
+					question,
+					rows_limit: opts.rows,
+				})) as typeof createRes;
+			} catch (err) {
+				if (isConnectorNotFoundError(err)) {
+					throw new CliError(t().errors.connectorNotFoundOnApi(connector.name), 1);
+				}
+				throw err;
+			}
 
 			const sql = createRes.sql_generated ?? createRes.sql ?? "";
 			const queryId = createRes.id ?? "";

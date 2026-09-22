@@ -1,6 +1,6 @@
 import { cleanup, render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { App } from "../src/tui/app.js";
@@ -229,6 +229,42 @@ describe("TUI App", () => {
 		await new Promise((r) => setTimeout(r, 50));
 		expect(lastFrame()).toContain("Usage");
 		expect(lastFrame()).toContain("Plan:");
+	});
+
+	it("Question: '/logout' clears stored credentials and flips the header offline", async () => {
+		writeFileSync(
+			join(tmpDir as string, "config.json"),
+			JSON.stringify({
+				api_url: "",
+				api_key: "",
+				last_login_at: "",
+				user_email: "joao@example.com",
+				user_name: "Joao",
+				plan_name: "Pro",
+			}),
+		);
+		const { lastFrame, stdin } = render(<App />);
+		expect(lastFrame()).toContain("joao@example.com");
+		stdin.write("/logout");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		const frame = lastFrame();
+		expect(frame).toContain("Logged out");
+		expect(frame).not.toContain("joao@example.com");
+		expect(frame).toContain("offline");
+		expect(existsSync(join(tmpDir as string, "config.json"))).toBe(false);
+	});
+
+	it("Question: '/login' opens the inline login screen", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("/login");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		const frame = lastFrame();
+		expect(frame).toContain("Log in to EasySQL");
+		expect(frame).toContain("API key:");
 	});
 
 	it("Question screen hint stays visible by default", () => {

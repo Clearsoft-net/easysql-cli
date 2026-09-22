@@ -28,7 +28,7 @@ import {
 	loadConnectors,
 	type StoredConnector,
 } from "../config/connectors-store.js";
-import { loadConfig, saveConfig } from "../config/store.js";
+import { clearConfig, loadConfig, saveConfig } from "../config/store.js";
 import { getSavedClient } from "../sdk/client.js";
 import { Footer, Header, TabBar } from "./chrome.js";
 import { ConnectorsScreen } from "./screens/connectors.js";
@@ -148,6 +148,19 @@ export function App({ initialConnector }: AppProps) {
 		: undefined;
 	const apiUrl = cfg.api_url || undefined;
 
+	// Clear the stored credentials and drop the cached identity so the
+	// header flips to offline. Returns false if the file could not be
+	// removed, letting the screen surface the failure inline.
+	const handleLogout = (): boolean => {
+		try {
+			clearConfig();
+		} catch {
+			return false;
+		}
+		setUser({});
+		return true;
+	};
+
 	return (
 		<Box flexDirection="column" height={rows}>
 			<Header
@@ -171,6 +184,8 @@ export function App({ initialConnector }: AppProps) {
 						onSwitchScreen={setScreen}
 						onOpenHelp={() => setHelpOpen(true)}
 						onQuit={() => exit()}
+						onLogout={handleLogout}
+						onLoggedIn={(u) => setUser({ email: u.email, plan: u.plan })}
 					/>
 				)}
 				{screen === "question" && !active && (

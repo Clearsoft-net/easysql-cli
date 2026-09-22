@@ -126,7 +126,7 @@ tests/                          # bun:test — one file per module + _helpers.ts
 
 - **Schema-only:** `introspectDatabase()` returns only `{tables, columns, types, pks, fks, rows_approx}`.
   Passwords, hosts, and ports NEVER cross the process boundary.
-- **Password never persisted.** `$XDG_CONFIG_HOME/easysql/connectors.json` stores only `name/type/host/port/user/database/ssl`. The password is re-prompted (or read from `$EASYSQL_DB_PASSWORD`) on every query run.
+- **Password never persisted.** `$XDG_CONFIG_HOME/easysql/connectors.json` stores only `name/type/host/port/user/database/ssl` plus `owner` (the account email that registered it). The password is re-prompted (or read from `$EASYSQL_DB_PASSWORD`) on every query run.
 - **API key in `config.json` with `0600`.** chmod is best-effort on Windows.
 - **Local SQL validator** (`src/util/sql-validator.ts`): tokenizer + regex, applied before touching the local DB. The server side already enforces this; this is defense in depth.
 - **Stacked statements rejected**, only one trailing `;` allowed, the head must be `WITH|SELECT|EXPLAIN|SHOW`.
@@ -137,7 +137,7 @@ tests/                          # bun:test — one file per module + _helpers.ts
 | File | Contents | Permissions |
 |---|---|---|
 | `~/.config/easysql/config.json` | `{api_url, api_key, last_login_at, user_email?, user_name?, plan_name?}` | 0600 |
-| `~/.config/easysql/connectors.json` | array `StoredConnector[]` (no password) | 0600 |
+| `~/.config/easysql/connectors.json` | array `StoredConnector[]` (no password; scoped per account via `owner`) | 0600 |
 | `~/.local/share/easysql/history.jsonl` | one JSON entry per line, append-only | 0600 |
 | Windows: `%APPDATA%\easysql\` + `%LOCALAPPDATA%\easysql\` | same scheme, chmod is a no-op | — |
 
@@ -208,7 +208,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 - Chrome (`src/tui/chrome.tsx`): **Header** with brand + active user email (via `me()`, cached in `config.json`) + connector + plan + version + API URL + online/offline status; **TabBar** as a segmented control (active tab in a cyan pill); **Footer** with contextual hints for the current screen and globals.
 - **Active user:** `App` (`src/tui/app.tsx`) calls `client.me()` on mount, updates the header, and persists `user_email`/`user_name`/`plan_name` to config for offline rendering; login already writes those fields.
 - Renders in the **alternate screen buffer** (vim/htop-style: fills the terminal and restores scrollback on exit). `mountTui` forces `interactive: true` in ink's `render()` — its auto-detection disables EVERYTHING if the `CI` env var is present in the user's shell (even on a real TTY), which made the TUI draw nothing and leave a black hole above the last frame. The `isatty()` gate in `repl.ts` already guarantees we only run on a TTY.
-- **Shortcut model:** `Tab` / `Shift-Tab` cycle Connectors → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
+- **Shortcut model:** `Tab` / `Shift-Tab` cycle Connectors → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
 - The **Question** screen uses a local `useInput` to build the text buffer and calls the same domain pipeline (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — no duplicated logic.
 - Keybindings:
   - Connectors: `j/k` or `↑/↓` navigate; `Enter` activates the highlighted connector or opens the add form when the last row ("+ Add a connector…") is selected; `s` syncs the highlighted connector; `d`/Del removes (confirm with `y`/Enter). In the form: `↑/↓` field, `←/→` type/SSL, `Enter` saves, `Esc` cancels.
@@ -216,7 +216,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
   - History: `h/l` or `←/→` paginate
   - Question: type the question, `Enter` submits, `Backspace` deletes; `/usage` shows plan/quota
   - Globals: `Tab` (next screen), `Shift-Tab` (previous), `Ctrl-C` (quit), `Esc` (close overlay)
-  - Slash-prompt: filterable dropdown — `/help` `/quit` `/connectors` `/history` `/question` `/clear` `/sync` `/usage`
+  - Slash-prompt: filterable dropdown — `/help` `/quit` `/connectors` `/history` `/question` `/clear` `/sync` `/usage` `/login` `/logout`
 - Tests in `tests/tui.test.tsx` use `ink-testing-library` (PassThrough stdin).
 - Without a TTY: `repl.ts` rejects with a message instructing `easysql query "..."`.
 

@@ -16,6 +16,9 @@ export const MESSAGES = {
 			configWriteError: (msg: string) => `Could not write config: ${msg}`,
 			noConnector: "No connector selected. Use --connector or run 'easysql connector list'.",
 			connectorNotFound: (name: string) => `Connector '${name}' not found.`,
+			connectorNotFoundOnApi: (name: string) =>
+				`Connector '${name}' no longer exists on the EasySQL API for the current account. ` +
+				`Re-register it with \`easysql connector add\` (or \`easysql demo\` for the sample database), then retry.`,
 			removeNonInteractive:
 				"Refusing to remove without confirmation in a non-interactive shell. Pass --yes.",
 			multipleConnectors: (n: number) =>

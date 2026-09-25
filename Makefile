@@ -10,7 +10,7 @@ ARCH          ?= $(shell uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/'
 # ---------------------------------------------------------------------------
 # .PHONY targets (strictly alphabetical)
 # ---------------------------------------------------------------------------
-.PHONY: build build-compile check clean deb help install lint lint-fix packages release-binaries rpm run test test-watch typecheck
+.PHONY: build build-compile check clean deb help install lint lint-fix packages release-binaries rpm run setup test test-watch typecheck
 
 # ---------------------------------------------------------------------------
 # help (default) — auto-generated menu
@@ -79,3 +79,5 @@ run: build-compile ## Compile and launch the interactive TUI
 # ---------------------------------------------------------------------------
 install: ## Install dependencies
 	bun install
+
+setup: install check test ## Full onboarding: install deps + lint/typecheck + tests

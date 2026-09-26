@@ -25,6 +25,7 @@ import {
 	upsertConnector,
 } from "../../config/connectors-store.js";
 import { introspectDatabase, type ParsedConnection } from "../../db/introspect.js";
+import { DEFAULT_PORTS, SUPPORTED_DB_TYPES } from "../../db/schema.js";
 import { getSavedClient } from "../../sdk/client.js";
 import { ConnectorSync } from "./connector-sync.js";
 
@@ -186,13 +187,10 @@ interface FieldDef {
 	secret?: boolean;
 }
 
-const TYPES: DbType[] = ["postgresql", "mysql", "mariadb", "sqlite"];
-const DEFAULT_PORT: Record<DbType, string> = {
-	postgresql: "5432",
-	mysql: "3306",
-	mariadb: "3306",
-	sqlite: "0",
-};
+const TYPES: DbType[] = [...SUPPORTED_DB_TYPES];
+const DEFAULT_PORT: Record<DbType, string> = Object.fromEntries(
+	Object.entries(DEFAULT_PORTS).map(([type, port]) => [type, String(port)]),
+) as Record<DbType, string>;
 
 function fieldsFor(type: DbType): FieldDef[] {
 	if (type === "sqlite") {

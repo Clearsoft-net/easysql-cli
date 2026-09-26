@@ -221,6 +221,73 @@ describe("TUI App", () => {
 		expect(lastFrame()).toContain("/sync: local-demo");
 	});
 
+	it("Question: non-sqlite queries ask for the password inline (regression: invisible stderr prompt)", async () => {
+		const originalFetch = globalThis.fetch;
+		const originalEnv = process.env.EASYSQL_DB_PASSWORD;
+		delete process.env.EASYSQL_DB_PASSWORD;
+		(globalThis as { fetch: typeof fetch }).fetch = ((input: string | URL | Request) => {
+			const url =
+				typeof input === "string"
+					? input
+					: input instanceof URL
+						? input.toString()
+						: input.url;
+			if (url.includes("/v1/queries")) {
+				return Promise.resolve(
+					new Response(JSON.stringify({ id: "q1", sql_generated: "SELECT 1" }), {
+						status: 201,
+						headers: { "content-type": "application/json" },
+					}),
+				);
+			}
+			return Promise.resolve(
+				new Response(JSON.stringify({ detail: "nope" }), {
+					status: 404,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+		}) as typeof fetch;
+		try {
+			writeFileSync(
+				join(tmpDir as string, "config.json"),
+				JSON.stringify({
+					api_url: "https://api.example.com",
+					api_key: "easysql_sk_test",
+					last_login_at: "",
+				}),
+			);
+			writeFileSync(
+				join(tmpDir as string, "connectors.json"),
+				JSON.stringify([
+					{
+						id: "ch-id",
+						name: "ch",
+						type: "clickhouse",
+						host: "h",
+						port: 8443,
+						user: "default",
+						database: "d",
+						ssl: true,
+						updated_at: "",
+					},
+				]),
+			);
+			const { lastFrame, stdin } = render(<App />);
+			stdin.write("count rows");
+			await new Promise((r) => setTimeout(r, 60));
+			stdin.write("\r");
+			await new Promise((r) => setTimeout(r, 250));
+			const frame = lastFrame();
+			expect(frame).toContain("Password for ch (clickhouse)");
+			expect(frame).toContain("Enter execute");
+			expect(frame).toContain("SELECT 1");
+		} finally {
+			(globalThis as { fetch: typeof fetch }).fetch = originalFetch;
+			if (originalEnv === undefined) delete process.env.EASYSQL_DB_PASSWORD;
+			else process.env.EASYSQL_DB_PASSWORD = originalEnv;
+		}
+	});
+
 	it("Question: '/usage' opens the usage panel", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("/usage");

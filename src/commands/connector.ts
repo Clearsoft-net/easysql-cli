@@ -1,10 +1,10 @@
 /**
  * `easysql connector add|sync|list` — manage local connectors.
  *
- * `add` introspects a LOCAL MySQL/PostgreSQL/SQLite database and pushes
- * ONLY the schema metadata to the EasySQL API. Credentials never leave
- * the host. SQLite connectors have no credentials — the connection
- * parameter is the absolute path to a `.db` file.
+ * `add` introspects a LOCAL MySQL/PostgreSQL/ClickHouse/SQLite database and
+ * pushes ONLY the schema metadata to the EasySQL API. Credentials never leave
+ * the host. SQLite connectors have no credentials — the connection parameter
+ * is the absolute path to a `.db` file.
  *
  * `sync` re-extracts the schema from a registered local DB and updates
  * the API-side cache.
@@ -34,6 +34,7 @@ import {
 	type ParsedConnection,
 	parseConnectionUrl,
 } from "../db/introspect.js";
+import { DB_TYPE_LIST, DEFAULT_PORTS, SUPPORTED_DB_TYPES } from "../db/schema.js";
 import { syncLocalConnector } from "../db/sync-connector.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
@@ -54,7 +55,7 @@ interface ConnectorAddOptions {
 	nonInteractive?: boolean;
 }
 
-const ALLOWED_TYPES: ParsedConnection["type"][] = ["mysql", "mariadb", "postgresql", "sqlite"];
+const ALLOWED_TYPES: ParsedConnection["type"][] = [...SUPPORTED_DB_TYPES];
 
 async function askLine(
 	question: string,
@@ -84,14 +85,8 @@ async function resolveConnection(opts: ConnectorAddOptions): Promise<ParsedConne
 	if (!name) throw new CliError("--name is required.", 1);
 
 	const rawType =
-		opts.type ??
-		(await askLine(
-			"Database type (mysql | mariadb | postgresql | sqlite)",
-			undefined,
-			nonInteractive,
-		));
-	if (!rawType)
-		throw new CliError("--type is required (mysql | mariadb | postgresql | sqlite).", 1);
+		opts.type ?? (await askLine(`Database type (${DB_TYPE_LIST})`, undefined, nonInteractive));
+	if (!rawType) throw new CliError(`--type is required (${DB_TYPE_LIST}).`, 1);
 	const type = rawType as ParsedConnection["type"];
 	if (!ALLOWED_TYPES.includes(type)) {
 		throw new CliError(
@@ -170,7 +165,7 @@ async function resolveNetworkConnection(
 			opts.database ?? (await askLine("Database name", undefined, nonInteractive));
 		if (!database) throw new CliError("--database is required.", 1);
 		const host = opts.host ?? (await askLine("Database host", "127.0.0.1", nonInteractive));
-		const portDefault = type === "postgresql" ? 5432 : 3306;
+		const portDefault = DEFAULT_PORTS[type];
 		const portRaw =
 			opts.port ?? (await askLine("Database port", String(portDefault), nonInteractive));
 		const port = Number.parseInt(String(portRaw), 10);
@@ -242,9 +237,9 @@ interface StoredConnectorView {
 function registerAdd(program: Command): void {
 	program
 		.command("add")
-		.description("Add a local MySQL/Postgres/SQLite connector (schema-only)")
+		.description("Add a local MySQL/Postgres/ClickHouse/SQLite connector (schema-only)")
 		.option("--name <name>", "Connector name")
-		.option("--type <type>", "mysql | mariadb | postgresql | sqlite")
+		.option("--type <type>", DB_TYPE_LIST)
 		.option("--connection-url <url>", "Full connection URL")
 		.option("--file <path>", "SQLite file path (when --type sqlite)")
 		.option("--host <host>", "Database host")

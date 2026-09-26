@@ -36,7 +36,8 @@ export const MESSAGES = {
 			apiKeyPrompt: "EasySQL API key",
 			connectorPickPrompt: "Pick a connector",
 			connectorNamePrompt: "Connector name",
-			connectorTypePrompt: "Database type (mysql | mariadb | postgresql | sqlite)",
+			connectorTypePrompt:
+				"Database type (mysql | mariadb | postgresql | clickhouse | sqlite)",
 			useConnectionUrlPrompt: "Use a full connection URL? (y/N)",
 			connectionUrlPrompt: "Connection URL",
 			dbHostPrompt: "Database host",

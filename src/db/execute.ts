@@ -1,13 +1,18 @@
 /**
  * Executes a (validated) SELECT statement against the local MySQL,
- * PostgreSQL or SQLite database via the @easysql/connector-* packages.
- * Returns rows as plain objects so the table renderer can format them
- * uniformly. No streaming — LIMIT<=100 keeps payloads small.
+ * PostgreSQL, ClickHouse or SQLite database via the @easysql/connector-*
+ * packages. Returns rows as plain objects so the table renderer can format
+ * them uniformly. No streaming — LIMIT<=100 keeps payloads small.
  */
 
 import type { Connector } from "@easysql/common";
 import { validateSelectOnly } from "../util/sql-validator.js";
-import { loadMysqlModule, loadPostgresModule, loadSqliteModule } from "./load-connector.js";
+import {
+	loadClickhouseModule,
+	loadMysqlModule,
+	loadPostgresModule,
+	loadSqliteModule,
+} from "./load-connector.js";
 
 export interface LocalQueryResult {
 	columns: string[];
@@ -17,7 +22,7 @@ export interface LocalQueryResult {
 }
 
 interface ConnSpec {
-	type: "mysql" | "mariadb" | "postgresql" | "sqlite";
+	type: "mysql" | "mariadb" | "postgresql" | "clickhouse" | "sqlite";
 	host?: string;
 	port?: number;
 	user?: string;
@@ -45,6 +50,17 @@ async function openConnector(spec: ConnSpec): Promise<Connector> {
 			return new PostgresConnector({
 				host: spec.host ?? "127.0.0.1",
 				port: spec.port ?? 5432,
+				user: spec.user ?? "",
+				password: spec.password ?? "",
+				database: spec.database,
+				ssl: spec.ssl,
+			});
+		}
+		case "clickhouse": {
+			const { ClickhouseConnector } = await loadClickhouseModule();
+			return new ClickhouseConnector({
+				host: spec.host ?? "127.0.0.1",
+				port: spec.port ?? 8123,
 				user: spec.user ?? "",
 				password: spec.password ?? "",
 				database: spec.database,

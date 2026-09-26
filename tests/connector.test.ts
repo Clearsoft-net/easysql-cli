@@ -187,6 +187,27 @@ describe("connector commands", () => {
 		expect(code).toBe(1);
 	});
 
+	it("connector add accepts --type clickhouse and fails gracefully when unreachable", async () => {
+		handler = (url) => {
+			if (url.endsWith("/v1/connectors")) {
+				return Promise.resolve(jsonResponse({ id: "c1", name: "x" }, 201));
+			}
+			throw new Error(`unexpected: ${url}`);
+		};
+		const code = await run([
+			"--json",
+			"connector",
+			"add",
+			"--name",
+			"CH",
+			"--type",
+			"clickhouse",
+			"--connection-url",
+			"clickhouse://default:pass@127.0.0.1:1/db",
+		]);
+		expect(code).toBe(1);
+	});
+
 	it("connector add returns 2 when not logged in", async () => {
 		writeFileSync(
 			join(tmp, "config.json"),

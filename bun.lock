@@ -5,10 +5,10 @@
     "": {
       "name": "@easysql/cli",
       "dependencies": {
-        "@easysql/client": "^2.0.0",
-        "@easysql/common": "^2.0.0",
-        "@easysql/connector-sqlite": "^2.0.0",
-        "@easysql/schema-generation": "^2.0.0",
+        "@easysql/client": "^2.2.0",
+        "@easysql/common": "^2.2.0",
+        "@easysql/connector-sqlite": "^2.2.0",
+        "@easysql/schema-generation": "^2.2.0",
         "chalk": "^5.3.0",
         "commander": "^12.1.0",
         "ink": "^7.1.1",
@@ -26,8 +26,9 @@
         "typescript": "^5.7.0",
       },
       "optionalDependencies": {
-        "@easysql/connector-mysql": "^2.0.0",
-        "@easysql/connector-postgres": "^2.0.0",
+        "@easysql/connector-clickhouse": "^2.2.0",
+        "@easysql/connector-mysql": "^2.2.0",
+        "@easysql/connector-postgres": "^2.2.0",
       },
     },
   },
@@ -52,17 +53,21 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.12", "", { "os": "win32", "cpu": "x64" }, "sha512-B1R/l+CwEpKFSuqiwePzPNRk1EiJN8kc0UhdafNz6MZN9v5OFP9HYP1irptvWzHrwVI4blVNGMbxc5zt70m3IA=="],
 
-    "@easysql/client": ["@easysql/client@2.0.0", "", { "dependencies": { "openapi-fetch": "^0.13.0" } }, "sha512-wq0nOZ1MxT5qvnQWXI80vq5v5cbDvEohGsQ/h5OaBuwEt642WZ9l0Q72e5xQBfsJZbmppRl7BZ/vk2rSUeS3mQ=="],
+    "@clickhouse/client": ["@clickhouse/client@1.23.1", "", {}, "sha512-vs3/Zc1dHvT171btW5nMoPsPCJ6QVJ5pp7obxzO5sjqwFx/jjz9wwCAqcFOdc2DhprugDBaVn+4dVY8hG3A9nw=="],
 
-    "@easysql/common": ["@easysql/common@2.0.0", "", {}, "sha512-akgPt4M8xsKC3RMjWhXUWyHCU7PorsjCPhKbwF8YaHHA0cMsMhawqEgqa0pv57n9Hql1GfiwQcu0bLaAkFCJ0g=="],
+    "@easysql/client": ["@easysql/client@2.2.0", "", { "dependencies": { "openapi-fetch": "^0.13.0" } }, "sha512-9adl+rxkzUh1En0u9T4NniAUJ4fQmW3G6yBPlTlY5PJIPIpLDHJO7mtCukRkYyh64Tywuif+sUHeXtqzO+3yhQ=="],
 
-    "@easysql/connector-mysql": ["@easysql/connector-mysql@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0", "mysql2": "^3.11.5" } }, "sha512-VYGVvUCujA+ZPqRiwXsQ8txhARg1do91qxSTj1sHA7r9UJLie1BEimimPCDJJ0lIzUNwsvCXYXeDkiEXetlXmw=="],
+    "@easysql/common": ["@easysql/common@2.2.0", "", {}, "sha512-kwb3VJf4gQhso+s+d1A+8kRXJVmFXX462UA4XP6xCyMOXfiA1FqTzHV7XKi+bxiiibLjejR3o8tCFDdRor3b/w=="],
 
-    "@easysql/connector-postgres": ["@easysql/connector-postgres@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0", "pg": "^8.13.1" } }, "sha512-FEgG/TuxXn5JP5BcpAfQp9/WSxV+8hK6DzX9U9J7ozKeZBLSZapwobZ98RGOoMbwXXQ7xfXcjJ9O/73OeE3XJg=="],
+    "@easysql/connector-clickhouse": ["@easysql/connector-clickhouse@2.2.0", "", { "dependencies": { "@clickhouse/client": "^1.23.1", "@easysql/common": "2.2.0" } }, "sha512-68wD/zP5XallfepxIJb2kz03cbSz5T+HOA6UES1InvrL8hh8nFemRvPc/gDpfVOz89EVXLzhmdj7xkf3CvCMow=="],
 
-    "@easysql/connector-sqlite": ["@easysql/connector-sqlite@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0" } }, "sha512-ljcMn003Sl3s9vYzZ/LD6Pfdnmme2FoOoYidNfYqC5aIfRBn+nDOkPjiy4Uy/NQU+9eNud47aT9pqy4CyJkRRw=="],
+    "@easysql/connector-mysql": ["@easysql/connector-mysql@2.2.0", "", { "dependencies": { "@easysql/common": "2.2.0", "mysql2": "^3.11.5" } }, "sha512-GdXIkewuGrReGb90JHA4S1ZXzOd+5GnFdA21FEmBQ1hWqN21vytLRsY9T/5u5QbDqAJs8XLHGRmaYuyqc0WNmQ=="],
 
-    "@easysql/schema-generation": ["@easysql/schema-generation@2.0.0", "", { "dependencies": { "@easysql/common": "2.0.0" } }, "sha512-V85QgFPLlYOCZEJzO4YeczbCySxaLgUXBUQVadB0JUYiCmJBJF+5aTVjK5bO0fJJ7RfH+aKv/mv3G90TkZdz7g=="],
+    "@easysql/connector-postgres": ["@easysql/connector-postgres@2.2.0", "", { "dependencies": { "@easysql/common": "2.2.0", "pg": "^8.13.1" } }, "sha512-iPCx4SyAaMe1agiJwdJAtmVLkX4NTt30C+/OYZEurtGXezhe+BeotrWzeRKdVQB7OpPKAqJ4KXbmW5XKQWC82Q=="],
+
+    "@easysql/connector-sqlite": ["@easysql/connector-sqlite@2.2.0", "", { "dependencies": { "@easysql/common": "2.2.0" } }, "sha512-0k8OfUhwwFiod/74TH3vwCQwuWl6dWQO3IWDkuzA0ZpCm9ONcI+ewaeZjOOMXjGM2AqnQ42OxRpIHzsolZiJmQ=="],
+
+    "@easysql/schema-generation": ["@easysql/schema-generation@2.2.0", "", { "dependencies": { "@easysql/common": "2.2.0" } }, "sha512-T49vq0L21YzT0rfzIX+x9WyvmxwLutTBcC3zFAgaqWn4M/5D2KDHmAOCqFdW8mSyu1DSuERDDxsIrrsrOm8SZw=="],
 
     "@types/bun": ["@types/bun@1.4.1", "", { "dependencies": { "bun-types": "1.4.1" } }, "sha512-0AVGiTXGajf1rgKom3N+c5L7CBxuoyyv1i44M0nX4UDK0G/fnRAMiri93nHuVPIb429KKtAgj7HatVmmOjeQLA=="],
 

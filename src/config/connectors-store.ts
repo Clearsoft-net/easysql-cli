@@ -20,7 +20,7 @@ import { loadConfig } from "./store.js";
 export interface StoredConnector {
 	id?: string;
 	name: string;
-	type: "mysql" | "mariadb" | "postgresql" | "sqlite";
+	type: "mysql" | "mariadb" | "postgresql" | "clickhouse" | "sqlite";
 	host: string;
 	port: number;
 	user: string;

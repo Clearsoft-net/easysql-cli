@@ -22,11 +22,11 @@
 
 ---
 
-Ask questions in natural language to your local **MySQL**, **PostgreSQL** or **SQLite** database — straight from your terminal.
+Ask questions in natural language to your local **MySQL**, **PostgreSQL**, **ClickHouse** or **SQLite** database — straight from your terminal.
 
 The **EasySQL CLI** is the open-source counterpart to the WordPress plugin. It runs the full EasySQL query flow client-side:
 
-1. You connect a local MySQL, PostgreSQL or SQLite database. (Or run `easysql demo` to spin up a sample SQLite database in seconds.)
+1. You connect a local MySQL, PostgreSQL, ClickHouse or SQLite database. (Or run `easysql demo` to spin up a sample SQLite database in seconds.)
 2. The CLI introspects the schema and pushes **only the schema metadata** to the EasySQL API — credentials never leave your machine. SQLite connectors have no credentials at all.
 3. You ask questions in natural language; the API returns SQL.
 4. The CLI validates that the SQL is **SELECT-only** and executes it against your local database.
@@ -59,10 +59,11 @@ chmod +x easysql && ./easysql --help
 
 Standalone binaries are published for `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64` and `windows-x64`.
 
-MySQL and PostgreSQL drivers are optional: SQLite works out of the box, and the
-other engines are installed on demand — `npm i @easysql/connector-mysql`,
-`bun add @easysql/connector-postgres`, etc. Without the package, the CLI prints
-an install hint instead of a module-resolution error.
+MySQL, PostgreSQL and ClickHouse drivers are optional: SQLite works out of
+the box, and the other engines are installed on demand — `npm i
+@easysql/connector-mysql`, `bun add @easysql/connector-postgres`,
+`bun add @easysql/connector-clickhouse`, etc. Without the package, the CLI
+prints an install hint instead of a module-resolution error.
 
 ## Quick start
 
@@ -86,6 +87,12 @@ easysql connector add \
   --type sqlite \
   --file /path/to/your.db
 
+# 2d. Or a local ClickHouse server (HTTP interface)
+easysql connector add \
+  --name "Local ClickHouse" \
+  --type clickhouse \
+  --connection-url "clickhouse://default:pass@localhost:8123/analytics"
+
 # 3. Ask a question
 easysql query "How many orders did we get last week?"
 
@@ -103,7 +110,7 @@ easysql
 | `easysql login` | Authenticate with an EasySQL API key |
 | `easysql logout` | Clear local credentials |
 | `easysql demo` | Generate a local sample SQLite database and register it as `local-demo` |
-| `easysql connector add` | Add a local MySQL / Postgres / SQLite connector |
+| `easysql connector add` | Add a local MySQL / Postgres / ClickHouse / SQLite connector |
 | `easysql connector sync [name]` | Re-introspect and push the schema again |
 | `easysql connector list` | List connectors from EasySQL |
 | `easysql connector remove <name>` | Remove a connector from EasySQL and locally |

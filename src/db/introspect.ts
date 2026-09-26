@@ -6,7 +6,12 @@
 
 import type { Connector } from "@easysql/common";
 import { generateSchema } from "@easysql/schema-generation";
-import { loadMysqlModule, loadPostgresModule, loadSqliteModule } from "./load-connector.js";
+import {
+	loadClickhouseModule,
+	loadMysqlModule,
+	loadPostgresModule,
+	loadSqliteModule,
+} from "./load-connector.js";
 import type { ParsedConnection } from "./parse-url.js";
 import type { ConnectorSchema } from "./schema.js";
 
@@ -27,6 +32,17 @@ async function openConnector(conn: ParsedConnection): Promise<Connector> {
 		case "postgresql": {
 			const { PostgresConnector } = await loadPostgresModule();
 			return new PostgresConnector({
+				host: conn.host,
+				port: conn.port,
+				user: conn.user,
+				password: conn.password,
+				database: conn.database,
+				ssl: conn.ssl,
+			});
+		}
+		case "clickhouse": {
+			const { ClickhouseConnector } = await loadClickhouseModule();
+			return new ClickhouseConnector({
 				host: conn.host,
 				port: conn.port,
 				user: conn.user,

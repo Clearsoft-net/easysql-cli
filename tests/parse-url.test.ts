@@ -21,6 +21,23 @@ describe("parseConnectionUrl", () => {
 		expect(c.database).toBe("analytics");
 	});
 
+	it("parses a clickhouse:// URL with the HTTP default port", () => {
+		const c = parseConnectionUrl("clickhouse://default:secret@ch.local/analytics");
+		expect(c.type).toBe("clickhouse");
+		expect(c.port).toBe(8123);
+		expect(c.user).toBe("default");
+		expect(c.password).toBe("secret");
+		expect(c.database).toBe("analytics");
+		expect(c.ssl).toBe(false);
+	});
+
+	it("parses a clickhouses:// URL as TLS on the HTTPS port", () => {
+		const c = parseConnectionUrl("clickhouses://default:secret@ch.local/db");
+		expect(c.type).toBe("clickhouse");
+		expect(c.port).toBe(8443);
+		expect(c.ssl).toBe(true);
+	});
+
 	it("decodes percent-encoded credentials", () => {
 		const c = parseConnectionUrl("mysql://user%40dom:p%40ss@db/x");
 		expect(c.user).toBe("user@dom");

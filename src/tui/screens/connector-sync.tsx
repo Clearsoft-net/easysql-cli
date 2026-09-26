@@ -1,8 +1,8 @@
 /**
  * Inline "sync connector" runner shared by the Connectors screen and the
  * Question screen (`/sync`). Re-introspects the local DB and pushes the
- * schema to EasySQL. For MySQL/Postgres it asks for the password (unless
- * `$EASYSQL_DB_PASSWORD` is set); SQLite needs none.
+ * schema to EasySQL. For MySQL/Postgres/ClickHouse it asks for the password
+ * (unless `$EASYSQL_DB_PASSWORD` is set); SQLite needs none.
  */
 
 import { Box, Text, useInput } from "ink";

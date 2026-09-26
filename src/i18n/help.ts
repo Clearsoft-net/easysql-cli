@@ -10,11 +10,11 @@ export const APP_NAME = "easysql";
 export const APP_TAGLINE = "Ask your database in natural language — from the terminal.";
 export const APP_DESCRIPTION = `
 The EasySQL CLI is the open-source client-side runtime for the EasySQL
-platform. It connects to your LOCAL MySQL or PostgreSQL database,
-extracts the schema, and pushes ONLY the schema metadata to the EasySQL
-API — credentials never leave your machine. Ask questions in plain
-English; the CLI validates that the generated SQL is SELECT-only and
-executes it locally.
+platform. It connects to your LOCAL MySQL, PostgreSQL, ClickHouse or
+SQLite database, extracts the schema, and pushes ONLY the schema metadata
+to the EasySQL API — credentials never leave your machine. Ask questions
+in plain English; the CLI validates that the generated SQL is SELECT-only
+and executes it locally.
 `.trim();
 
 export const HELP_TOP = `
@@ -29,7 +29,7 @@ Commands:
   login                 Authenticate with an EasySQL API key
   logout                Clear stored credentials
   demo                  Generate a local sample SQLite database (local-demo)
-  connector add         Add a local MySQL/Postgres/SQLite connector
+  connector add         Add a local MySQL/Postgres/ClickHouse/SQLite connector
   connector sync        Re-extract and push schema metadata
   connector list        List connectors known to EasySQL
   connector remove      Remove a local connector (and delete it from EasySQL)
@@ -83,12 +83,13 @@ Removes the stored API key from the local config file.
 export const HELP_CONNECTOR_ADD = `
 Usage: easysql connector add [options]
 
-Connect to a LOCAL MySQL, PostgreSQL or SQLite database, extract its
-schema (tables, columns, types, primary keys, foreign keys, row-count
-estimates), and push ONLY the schema metadata to EasySQL. Connection
-credentials are NEVER sent to the API — they are kept in memory for the
-introspection step and discarded. SQLite connectors have no credentials:
-the only required parameter is the absolute file path to a .db file.
+Connect to a LOCAL MySQL, PostgreSQL, ClickHouse or SQLite database,
+extract its schema (tables, columns, types, primary keys, foreign keys,
+row-count estimates), and push ONLY the schema metadata to EasySQL.
+Connection credentials are NEVER sent to the API — they are kept in memory
+for the introspection step and discarded. SQLite connectors have no
+credentials: the only required parameter is the absolute file path to a
+.db file.
 
 By default, the command is interactive: missing required values are
 prompted for one at a time. Pass --non-interactive (or -y) to disable
@@ -97,13 +98,15 @@ or the command exits with code 1.
 
 Required (always):
   --name <name>         Human-readable connector name
-  --type <type>         'mysql' | 'mariadb' | 'postgresql' | 'sqlite'
+  --type <type>         'mysql' | 'mariadb' | 'postgresql' | 'clickhouse' | 'sqlite'
 
 Connection (one of --connection-url OR --host/--port/...):
   --connection-url <url> Full URL: mysql://user:pass@host:port/db
+                          or clickhouse://user:pass@host:8123/db
                           or sqlite:///absolute/path/to.db
   --host <host>         Database host (default: 127.0.0.1)
-  --port <port>         Database port (default: 3306 for MySQL, 5432 for Postgres)
+  --port <port>         Database port (default: 3306 MySQL, 5432 Postgres,
+                        8123 ClickHouse)
   --user <user>         Database user
   --password <pass>     Database password (otherwise prompted securely)
   --database <db>       Database name
@@ -113,7 +116,7 @@ SQLite-specific:
                         (alternative to --connection-url sqlite:///...)
 
 Options:
-  --ssl                 Require SSL/TLS
+  --ssl                 Require SSL/TLS (ClickHouse: HTTPS on 8443)
   -y, --non-interactive  Disable prompts; fail when required values are missing
 
 Example:
@@ -121,6 +124,11 @@ Example:
     --name "Local Postgres" \\
     --type postgresql \\
     --host localhost --port 5432 --database mydb --user me
+
+  easysql connector add \\
+    --name "Local ClickHouse" \\
+    --type clickhouse \\
+    --connection-url "clickhouse://default:pass@localhost:8123/analytics"
 
   easysql connector add --name "Local SQLite" --type sqlite --file /tmp/app.db
 
@@ -135,8 +143,8 @@ Usage: easysql connector sync [name] [options]
 
 Re-introspect a locally-registered connector and push the updated schema
 metadata to EasySQL (POST /v1/connectors/{id}/sync). The local database is
-contacted again, so a password is required for MySQL/Postgres connectors
-(SQLite has none); it is used in memory only and never persisted.
+contacted again, so a password is required for MySQL/Postgres/ClickHouse
+connectors (SQLite has none); it is used in memory only and never persisted.
 
 With no argument and exactly one local connector, that connector is synced.
 

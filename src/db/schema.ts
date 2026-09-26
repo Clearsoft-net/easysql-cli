@@ -23,6 +23,27 @@ export type ConnectorSchema = TableSchema[];
 
 export type DatabaseType = ConnectorEngine;
 
+/** Every engine the CLI can register — order matters for the TUI picker. */
+export const SUPPORTED_DB_TYPES: readonly DatabaseType[] = [
+	"postgresql",
+	"mysql",
+	"mariadb",
+	"clickhouse",
+	"sqlite",
+];
+
+/** Native default port per engine (`0` for file-based SQLite). */
+export const DEFAULT_PORTS: Record<DatabaseType, number> = {
+	mysql: 3306,
+	mariadb: 3306,
+	postgresql: 5432,
+	clickhouse: 8123,
+	sqlite: 0,
+};
+
+/** Human-readable list for prompts and error messages. */
+export const DB_TYPE_LIST = SUPPORTED_DB_TYPES.join(" | ");
+
 export interface ConnectorSummary {
 	id: string;
 	type: DatabaseType | "external";

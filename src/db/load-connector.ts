@@ -1,7 +1,7 @@
 /**
  * Lazy loader for the engine-specific @easysql/connector-* packages.
- * mysql/postgres are optionalDependencies — installed only when used —
- * so a missing package surfaces as an install hint instead of a bare
+ * mysql/postgres/clickhouse are optionalDependencies — installed only when
+ * used — so a missing package surfaces as an install hint instead of a bare
  * module-resolution error.
  */
 
@@ -9,6 +9,7 @@ import { CliError } from "../cli/errors.js";
 
 type MysqlModule = typeof import("@easysql/connector-mysql");
 type PostgresModule = typeof import("@easysql/connector-postgres");
+type ClickhouseModule = typeof import("@easysql/connector-clickhouse");
 type SqliteModule = typeof import("@easysql/connector-sqlite");
 
 function isMissingModule(err: unknown): boolean {
@@ -42,6 +43,16 @@ export async function loadPostgresModule(): Promise<PostgresModule> {
 	} catch (err) {
 		if (isMissingModule(err))
 			throw new CliError(hint("PostgreSQL", "@easysql/connector-postgres"), 1);
+		throw err;
+	}
+}
+
+export async function loadClickhouseModule(): Promise<ClickhouseModule> {
+	try {
+		return await import("@easysql/connector-clickhouse");
+	} catch (err) {
+		if (isMissingModule(err))
+			throw new CliError(hint("ClickHouse", "@easysql/connector-clickhouse"), 1);
 		throw err;
 	}
 }

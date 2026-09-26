@@ -32,8 +32,11 @@ import {
 import { executeSelect, type LocalQueryResult } from "../../db/execute.js";
 import { appendHistory } from "../../history/store.js";
 import { t } from "../../i18n/messages.js";
-import { getSavedClient, isConnectorNotFoundError } from "../../sdk/client.js";
-import { promptSecret } from "../../util/prompt.js";
+import {
+	type AuthenticatedClient,
+	getSavedClient,
+	isConnectorNotFoundError,
+} from "../../sdk/client.js";
 import type { ScreenName } from "../app.js";
 import { Cursor } from "../cursor.js";
 import { ResultTable } from "../result-table.js";
@@ -62,12 +65,17 @@ interface QueryResponse {
 	needs_local_execution?: boolean;
 }
 
-async function readPasswordInteractive(): Promise<string> {
-	const env = process.env.EASYSQL_DB_PASSWORD;
-	if (env && env.length > 0) return env;
-	const secret = await promptSecret("Database password: ");
-	if (!secret) throw new Error("Database password required.");
-	return secret;
+/**
+ * A query whose SQL was generated but whose local execution is waiting for
+ * the database password. The password is never persisted, so the TUI must
+ * ask for it inline (a `promptSecret` on stderr would be wiped by ink's
+ * alternate-screen redraws and look like a hang).
+ */
+interface PendingExecution {
+	client: AuthenticatedClient;
+	connector: StoredConnector;
+	sql: string;
+	queryId?: string;
 }
 
 type SlashCmd =
@@ -171,16 +179,37 @@ export function QuestionScreen({
 	const [err, setErr] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [pending, setPending] = useState<PendingExecution | null>(null);
+	const [password, setPassword] = useState("");
 	const [syncTarget, setSyncTarget] = useState<StoredConnector | null>(null);
 	const [usageOpen, setUsageOpen] = useState(false);
 	const [loginOpen, setLoginOpen] = useState(false);
 
 	useEffect(() => {
-		onBusyChange?.(busy || loginOpen);
-	}, [busy, loginOpen, onBusyChange]);
+		onBusyChange?.(busy || loginOpen || pending !== null);
+	}, [busy, loginOpen, pending, onBusyChange]);
 
 	useInput((input, key) => {
 		if (syncTarget || usageOpen || loginOpen) return;
+		if (pending) {
+			if (key.escape) {
+				setPending(null);
+				setPassword("");
+				setNotice("Query cancelled — no password entered.");
+				return;
+			}
+			if (key.return) {
+				void submitPassword();
+				return;
+			}
+			if (key.backspace || key.delete) {
+				setPassword((p) => p.slice(0, -1));
+				return;
+			}
+			if (key.ctrl || key.meta || key.tab) return;
+			if (input) setPassword((p) => p + input);
+			return;
+		}
 		if (busy) return;
 
 		// Slash-command mode.
@@ -317,6 +346,80 @@ export function QuestionScreen({
 		}
 	});
 
+	function fail(e: unknown, connectorName: string): void {
+		if (isConnectorNotFoundError(e)) {
+			setErr(t().errors.connectorNotFoundOnApi(connectorName));
+		} else {
+			setErr(e instanceof Error ? e.message : String(e));
+		}
+		setStatus("error");
+	}
+
+	async function finishExecution(
+		client: AuthenticatedClient,
+		stored: StoredConnector,
+		generated: string,
+		queryId: string | undefined,
+		pw: string,
+		question: string,
+	): Promise<void> {
+		setStatus("executing");
+		const r = await executeSelect(
+			{
+				type: stored.type,
+				host: stored.host,
+				port: stored.port,
+				user: stored.user,
+				password: pw,
+				database: stored.database,
+				ssl: stored.ssl,
+			},
+			generated,
+		);
+		setResult(r);
+		setStatus("ok");
+
+		upsertConnector({ ...stored, updated_at: new Date().toISOString() });
+		try {
+			if (queryId) {
+				await client.answerQuery({ result_data: r.rows }, queryId);
+			}
+		} catch {
+			// answer upload is best-effort; the table is already shown
+		}
+		appendHistory({
+			at: new Date().toISOString(),
+			question,
+			connector: stored.name,
+			sql: generated,
+			row_count: r.row_count,
+			duration_ms: r.duration_ms,
+			status: "ok",
+		});
+	}
+
+	async function submitPassword(): Promise<void> {
+		if (!pending) return;
+		setBusy(true);
+		setErr(null);
+		try {
+			await finishExecution(
+				pending.client,
+				pending.connector,
+				pending.sql,
+				pending.queryId,
+				password,
+				asked ?? "",
+			);
+		} catch (e) {
+			fail(e, pending.connector.name);
+		} finally {
+			setPending(null);
+			setPassword("");
+			setBusy(false);
+		}
+	}
+
 	async function runFlow() {
 		const question = buf.trim();
 		if (question.length === 0) return;
@@ -343,46 +446,31 @@ export function QuestionScreen({
 			const generated = createRes.sql_generated ?? createRes.sql ?? "";
 			setSql(generated);
 
-			setStatus("executing");
-			const r = await executeSelect(
-				{
-					type: stored.type,
-					host: stored.host,
-					port: stored.port,
-					user: stored.user,
-					password: stored.type === "sqlite" ? "" : await readPasswordInteractive(),
-					database: stored.database,
-					ssl: stored.ssl,
-				},
-				generated,
-			);
-			setResult(r);
-			setStatus("ok");
+			const env = process.env.EASYSQL_DB_PASSWORD;
+			const envPassword = env && env.length > 0 ? env : "";
+			if (stored.type !== "sqlite" && envPassword.length === 0) {
+				// Ask for the password inline: a raw-mode stderr prompt would
+				// be erased by ink's redraws and look like a hang.
+				setStatus("idle");
+				setPending({
+					client,
+					connector: stored,
+					sql: generated,
+					queryId: createRes.id,
+				});
+				return;
+			}
 
-			upsertConnector({ ...stored, updated_at: new Date().toISOString() });
-			try {
-				if (createRes.id) {
-					await client.answerQuery({ result_data: r.rows }, createRes.id);
-				}
-			} catch {
-				// answer upload is best-effort; the table is already shown
-			}
-			appendHistory({
-				at: new Date().toISOString(),
+			await finishExecution(
+				client,
+				stored,
+				generated,
+				createRes.id,
+				envPassword,
 				question,
-				connector: stored.name,
-				sql: generated,
-				row_count: r.row_count,
-				duration_ms: r.duration_ms,
-				status: "ok",
-			});
+			);
 		} catch (e) {
-			if (isConnectorNotFoundError(e)) {
-				setErr(t().errors.connectorNotFoundOnApi(stored.name));
-			} else {
-				setErr(e instanceof Error ? e.message : String(e));
-			}
-			setStatus("error");
+			fail(e, stored.name);
 		} finally {
 			setBusy(false);
 		}
@@ -412,6 +500,20 @@ export function QuestionScreen({
 					{err && <Text color="red">Error: {err}</Text>}
 					{notice && <Text color="yellow">{notice}</Text>}
 				</Box>
+
+				{pending && (
+					<Box marginTop={1} flexDirection="column">
+						<Text color="cyan">
+							Password for {pending.connector.name} ({pending.connector.type})
+						</Text>
+						<Text>
+							{"*".repeat(password.length)}
+							{!busy && <Cursor color="cyan" />}
+							{password.length === 0 && <Text dimColor> type the password…</Text>}
+						</Text>
+						<Text dimColor>Enter execute · Esc cancel</Text>
+					</Box>
+				)}
 
 				{asked && (status === "generating" || status === "executing" || result || sql) && (
 					<Box marginTop={1} flexDirection="column">

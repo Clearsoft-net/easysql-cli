@@ -4,7 +4,7 @@ Operational context for **easysql-cli** — the open-source CLI/TUI for the Easy
 
 ## What it is
 
-A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connectors (schema-only), runs natural-language queries through the EasySQL API, validates that the generated SQL is SELECT-only, executes it locally, and prints the results as a table. It ships an interactive TUI, self-update via GitHub Releases, and an `easysql demo` command that generates a sample SQLite database for instant experimentation.
+A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLite connectors (schema-only), runs natural-language queries through the EasySQL API, validates that the generated SQL is SELECT-only, executes it locally, and prints the results as a table. It ships an interactive TUI, self-update via GitHub Releases, and an `easysql demo` command that generates a sample SQLite database for instant experimentation.
 
 **Core principle:** database credentials NEVER leave the host. Only schema metadata is sent to the API.
 
@@ -13,12 +13,12 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connecto
 - **Language:** TypeScript 5.7 (strict, `noUncheckedIndexedAccess`)
 - **Runtime:** Node >=22.13 or Bun >=1.4 (engines: `bun >=1.4.0`, `node >=22.13.0`); `node:sqlite` powers `demo` + the sqlite connector
 - **CLI framework:** commander 12 + a hand-written help manual in `src/i18n/help.ts`
-- **HTTP SDK:** `@easysql/client ^2.0.0` (openapi-fetch client, modular org `@easysql/*`)
-- **DB layer:** `@easysql/connector-mysql` + `@easysql/connector-postgres` + `@easysql/connector-sqlite` (introspect + execute), `@easysql/schema-generation` (raw → API payload), contracts re-exported from `@easysql/common`
+- **HTTP SDK:** `@easysql/client ^2.2.0` (openapi-fetch client, modular org `@easysql/*`)
+- **DB layer:** `@easysql/connector-mysql` + `@easysql/connector-postgres` + `@easysql/connector-clickhouse` + `@easysql/connector-sqlite` (introspect + execute), `@easysql/schema-generation` (raw → API payload), contracts re-exported from `@easysql/common`
 - **Output:** `chalk 5` (auto-detect TTY), custom table renderer
 - **Lint/format:** Biome 2.5 (`biome.json`, tabs, 100 col, LF, double quotes)
 - **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` in dev) — running `easysql` with no subcommand opens React in the terminal
-- **Tests:** `bun test` (117 specs, no vitest dependency)
+- **Tests:** `bun test` (142 specs, no vitest dependency)
 - **Build:**
   - `bun run build` → `tsc -p scripts/tsconfig.json` → `dist/`
   - `bun run build:compile` → `bun build --compile --minify` → `bin/easysql` (standalone ~92 MB)
@@ -30,7 +30,7 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/SQLite connecto
 | `easysql login` | Authenticates with an API key (`--api-key` / `$EASYSQL_API_KEY` / `--non-interactive`, -y) |
 | `easysql logout` | Clears local credentials |
 | `easysql demo` | Generates a local sample SQLite database and registers it as `local-demo` |
-| `easysql connector add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/sqlite) |
+| `easysql connector add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/clickhouse/sqlite) |
 | `easysql connector sync [name]` | Re-introspects and re-sends the schema (`syncConnector`); with no name, uses the single local connector |
 | `easysql connector list` | Lists connectors known to the API |
 | `easysql connector remove <name>` | Removes the connector server-side (best-effort) and locally (`--yes` skips confirmation) |
@@ -60,7 +60,7 @@ src/
 │   ├── login.ts                # registerLogin(program)
 │   ├── logout.ts
 │   ├── demo.ts                 # easysql demo — generates a sample local SQLite DB
-│   ├── connector.ts            # add|sync|remove|list group (mysql/mariadb/postgresql/sqlite)
+│   ├── connector.ts            # add|sync|remove|list group (mysql/mariadb/postgresql/clickhouse/sqlite)
 │   ├── query.ts                # registerQuery
 │   ├── usage.ts
 │   ├── history.ts
@@ -72,7 +72,7 @@ src/
 │   ├── store.ts                # loadConfig/saveConfig/clearConfig/isLoggedIn (0600)
 │   └── connectors-store.ts     # CRUD for local connectors (0600, no password)
 ├── db/
-│   ├── schema.ts               # re-exports ColumnSchema/TableSchema from @easysql/common + local aliases
+│   ├── schema.ts               # re-exports schema types from @easysql/common + SUPPORTED_DB_TYPES/DEFAULT_PORTS
 │   ├── introspect.ts           # dispatcher over @easysql/connector-* + generateSchema()
 │   ├── introspect-sqlite.ts    # thin SqliteConnector wrapper (kept for existing imports)
 │   ├── demo.ts                 # buildDemoDatabase() — sample customers/products/orders
@@ -161,7 +161,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 - `login` validates by calling `me()` before persisting; 401/403 → invalid-key error.
 - `createQuery` returns `{id, sql_generated, needs_local_execution, status}`; `query.ts` reads `sql_generated`, executes locally, then calls `answerQuery` (POST `/v1/queries/:id/answer`) with `result_data: result.rows` so the API can generate the answer+chart.
 - `syncConnector` requires a `{schema: TableSchema[]}` body; `connector.ts:282` still rejects `--id` with an explicit error — that is the place to change when implementing sync-by-name.
-- DB work goes through the SDK too: `introspectDatabase()` opens the matching `@easysql/connector-*` class and maps raw → payload with `generateSchema()`; `executeSelect()` validates SELECT-only first, then delegates to `connector.execute()`. Schema/URL contracts come from `@easysql/common`. Connectors load lazily via `src/db/load-connector.ts` (`import()` per engine) — only the driver for the active connector type is loaded. `connector-mysql`/`connector-postgres` are `optionalDependencies` (install on demand with `bun add @easysql/connector-mysql`); a missing package surfaces as a `CliError` install hint, not a bare resolution error. `connector-sqlite` stays required (demo + default path).
+- DB work goes through the SDK too: `introspectDatabase()` opens the matching `@easysql/connector-*` class and maps raw → payload with `generateSchema()`; `executeSelect()` validates SELECT-only first, then delegates to `connector.execute()`. Schema/URL contracts come from `@easysql/common`. Connectors load lazily via `src/db/load-connector.ts` (`import()` per engine) — only the driver for the active connector type is loaded. `connector-mysql`/`connector-postgres`/`connector-clickhouse` are `optionalDependencies` (install on demand with `bun add @easysql/connector-mysql`); a missing package surfaces as a `CliError` install hint, not a bare resolution error. `connector-sqlite` stays required (demo + default path).
 
 ## Self-update
 
@@ -210,9 +210,10 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 - Renders in the **alternate screen buffer** (vim/htop-style: fills the terminal and restores scrollback on exit). `mountTui` forces `interactive: true` in ink's `render()` — its auto-detection disables EVERYTHING if the `CI` env var is present in the user's shell (even on a real TTY), which made the TUI draw nothing and leave a black hole above the last frame. The `isatty()` gate in `repl.ts` already guarantees we only run on a TTY.
 - **Shortcut model:** `Tab` / `Shift-Tab` cycle Connectors → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
 - The **Question** screen uses a local `useInput` to build the text buffer and calls the same domain pipeline (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — no duplicated logic.
+- **DB password in the TUI is always an inline field**, never `promptSecret`: for non-SQLite connectors the Question screen renders a `Password for <name>` input (masked, `Enter` executes, `Esc` cancels) after the API returns the SQL. A raw-mode `promptSecret` on stderr is erased by ink's alternate-screen redraws and looked like a hang. `$EASYSQL_DB_PASSWORD` bypasses the prompt. The sync runner (`<ConnectorSync>`) uses the same inline pattern.
 - Keybindings:
   - Connectors: `j/k` or `↑/↓` navigate; `Enter` activates the highlighted connector or opens the add form when the last row ("+ Add a connector…") is selected; `s` syncs the highlighted connector; `d`/Del removes (confirm with `y`/Enter). In the form: `↑/↓` field, `←/→` type/SSL, `Enter` saves, `Esc` cancels.
-  - Sync (Connectors `s` and Question `/sync`): `<ConnectorSync>` (`src/tui/screens/connector-sync.tsx`) re-introspects and calls `syncLocalConnector`; asks for an inline password for MySQL/Postgres (uses `$EASYSQL_DB_PASSWORD` if set), SQLite does not need one.
+  - Sync (Connectors `s` and Question `/sync`): `<ConnectorSync>` (`src/tui/screens/connector-sync.tsx`) re-introspects and calls `syncLocalConnector`; asks for an inline password for MySQL/Postgres/ClickHouse (uses `$EASYSQL_DB_PASSWORD` if set), SQLite does not need one.
   - History: `h/l` or `←/→` paginate
   - Question: type the question, `Enter` submits, `Backspace` deletes; `/usage` shows plan/quota
   - Globals: `Tab` (next screen), `Shift-Tab` (previous), `Ctrl-C` (quit), `Esc` (close overlay)
@@ -227,7 +228,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 | Add a subcommand | `src/commands/<name>.ts` + register in `src/cli/program.ts` + entry in `src/i18n/help.ts` + manual in `commands/help.ts` |
 | Change UI text | `src/i18n/messages.ts` (`t()`) |
 | Change help text | `src/i18n/help.ts` + map in `src/commands/help.ts` |
-| Add a DB driver | new `@easysql/connector-*` dep + case in `openConnector()` in `src/db/introspect.ts` + `src/db/execute.ts` |
+| Add a DB driver | new `@easysql/connector-*` dep (optionalDep if not SQLite) + `SUPPORTED_DB_TYPES`/`DEFAULT_PORTS` in `src/db/schema.ts` + `StoredConnector` in `src/config/connectors-store.ts` + `load-*`/case in `src/db/load-connector.ts`, `src/db/introspect.ts`, `src/db/execute.ts` + `ALLOWED_TYPES` in `src/commands/connector.ts` + `TYPES` in `src/tui/screens/connectors.tsx` |
 | Add an API endpoint | `RawSdk` + `AuthenticatedClient` + `getAuthenticatedClient` in `src/sdk/client.ts` |
 | Change the persisted schema | `StoredConnector` in `src/config/connectors-store.ts` (migrate manually — no migration runner) |
 | Add a history entry | `HistoryEntry` in `src/history/store.ts` + write in `appendHistory` from the command |
@@ -237,7 +238,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 ```bash
 bun install --frozen-lockfile   # the lockfile is mandatory in CI
 bun run check                   # biome + tsc --noEmit (lint+typecheck)
-bun test                        # 117 specs (sqlite + demo + TUI included)
+bun test                        # 142 specs (sqlite + demo + TUI included)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
 make deb                        # .deb package for the host arch (ARCH=arm64 to cross-build)
@@ -249,9 +250,9 @@ make rpm                        # .rpm package for the host arch (ARCH=arm64 to 
 
 ## Current state
 
-- 117/117 tests passing (`bun test`).
+- 142/142 tests passing (`bun test`).
 - `bun run check` clean (minor `noExplicitAny` warnings in the SDK wrapper and 1 `useImportType` — non-blocking).
 - Standalone binary `bin/easysql` already built (~92 MB).
 - `bin/` and `dist/` are in `.gitignore` — do not commit.
 - Public repo: https://github.com/Clearsoft-net/easysql-cli (branch `main`).
-- SDK: modular `@easysql/*` v2.0.0 on npm (`client`, `common`, `schema-generation`, `connector-mysql/postgres/sqlite`), consumed via `^2.0.0`.
+- SDK: modular `@easysql/*` v2.2.0 on npm (`client`, `common`, `schema-generation`, `connector-mysql/postgres/clickhouse/sqlite`), consumed via `^2.2.0`.

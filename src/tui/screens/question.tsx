@@ -30,6 +30,7 @@ import {
 	upsertConnector,
 } from "../../config/connectors-store.js";
 import { executeSelect, type LocalQueryResult } from "../../db/execute.js";
+import { storedPassword } from "../../db/password.js";
 import { appendHistory } from "../../history/store.js";
 import { t } from "../../i18n/messages.js";
 import {
@@ -67,9 +68,10 @@ interface QueryResponse {
 
 /**
  * A query whose SQL was generated but whose local execution is waiting for
- * the database password. The password is never persisted, so the TUI must
- * ask for it inline (a `promptSecret` on stderr would be wiped by ink's
- * alternate-screen redraws and look like a hang).
+ * the database password: `$EASYSQL_DB_PASSWORD` and the OS keyring were
+ * consulted first and came up empty, so the TUI asks inline (a
+ * `promptSecret` on stderr would be wiped by ink's alternate-screen
+ * redraws and look like a hang).
  */
 interface PendingExecution {
 	client: AuthenticatedClient;
@@ -446,9 +448,9 @@ export function QuestionScreen({
 			const generated = createRes.sql_generated ?? createRes.sql ?? "";
 			setSql(generated);
 
-			const env = process.env.EASYSQL_DB_PASSWORD;
-			const envPassword = env && env.length > 0 ? env : "";
-			if (stored.type !== "sqlite" && envPassword.length === 0) {
+			const direct =
+				stored.type === "sqlite" ? "" : ((await storedPassword(stored.name)) ?? "");
+			if (stored.type !== "sqlite" && direct.length === 0) {
 				// Ask for the password inline: a raw-mode stderr prompt would
 				// be erased by ink's redraws and look like a hang.
 				setStatus("idle");
@@ -461,14 +463,7 @@ export function QuestionScreen({
 				return;
 			}
 
-			await finishExecution(
-				client,
-				stored,
-				generated,
-				createRes.id,
-				envPassword,
-				question,
-			);
+			await finishExecution(client, stored, generated, createRes.id, direct, question);
 		} catch (e) {
 			fail(e, stored.name);
 		} finally {

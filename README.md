@@ -128,7 +128,7 @@ Global flags: `--api-url`, `--config`, `--json`, `--no-color`, `-v`, `-h`.
 - **Credentials never leave your machine.** The CLI only introspects your local database to extract schema metadata (`tables`, `columns`, `types`, `primary_keys`, `foreign_keys`, `row_count_estimate`) and sends that — never passwords, hosts, or ports.
 - **Read-only enforcement.** Generated SQL is validated server-side by the EasySQL API. The CLI additionally refuses to execute any non-SELECT statement.
 - **API key storage.** Stored in `~/.config/easysql/config.json` with `0600` permissions.
-- Database passwords are never persisted: they are re-prompted (or read from `$EASYSQL_DB_PASSWORD`) on every query.
+- Database passwords stay on your machine: they resolve from `$EASYSQL_DB_PASSWORD`, then your OS keyring (opt-in with `connector add --save-password`), then a prompt — never to the API.
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 

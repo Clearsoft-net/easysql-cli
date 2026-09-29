@@ -224,7 +224,9 @@ describe("TUI App", () => {
 	it("Question: non-sqlite queries ask for the password inline (regression: invisible stderr prompt)", async () => {
 		const originalFetch = globalThis.fetch;
 		const originalEnv = process.env.EASYSQL_DB_PASSWORD;
+		const originalKeyring = process.env.EASYSQL_KEYRING;
 		delete process.env.EASYSQL_DB_PASSWORD;
+		process.env.EASYSQL_KEYRING = "0";
 		(globalThis as { fetch: typeof fetch }).fetch = ((input: string | URL | Request) => {
 			const url =
 				typeof input === "string"
@@ -285,6 +287,8 @@ describe("TUI App", () => {
 			(globalThis as { fetch: typeof fetch }).fetch = originalFetch;
 			if (originalEnv === undefined) delete process.env.EASYSQL_DB_PASSWORD;
 			else process.env.EASYSQL_DB_PASSWORD = originalEnv;
+			if (originalKeyring === undefined) delete process.env.EASYSQL_KEYRING;
+			else process.env.EASYSQL_KEYRING = originalKeyring;
 		}
 	});
 

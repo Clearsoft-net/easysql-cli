@@ -26,6 +26,7 @@ function urlOf(input: string | URL | Request): string {
 describe("connector commands", () => {
 	let tmp: string;
 	let originalFetch: typeof fetch;
+	let originalKeyring: string | undefined;
 	let handler: FetchHandler | undefined;
 	const loggedInConfig = {
 		api_url: "https://api.example.com",
@@ -37,6 +38,8 @@ describe("connector commands", () => {
 		tmp = mkdtempSync(join(tmpdir(), "easysql-connector-"));
 		setConfigPathOverride(join(tmp, "config.json"));
 		writeFileSync(join(tmp, "config.json"), JSON.stringify(loggedInConfig));
+		originalKeyring = process.env.EASYSQL_KEYRING;
+		process.env.EASYSQL_KEYRING = "0";
 		originalFetch = globalThis.fetch;
 		(globalThis as { fetch: typeof fetch }).fetch = ((
 			input: string | URL | Request,
@@ -49,6 +52,8 @@ describe("connector commands", () => {
 
 	afterEach(() => {
 		(globalThis as { fetch: typeof fetch }).fetch = originalFetch;
+		if (originalKeyring === undefined) delete process.env.EASYSQL_KEYRING;
+		else process.env.EASYSQL_KEYRING = originalKeyring;
 		handler = undefined;
 		setConfigPathOverride(undefined);
 		rmSync(tmp, { recursive: true, force: true });

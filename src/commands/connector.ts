@@ -28,18 +28,20 @@ import {
 	removeConnector,
 	upsertConnector,
 } from "../config/connectors-store.js";
+import { keyringDelete } from "../config/keyring.js";
 import {
 	introspectDatabase,
 	mergeConnection,
 	type ParsedConnection,
 	parseConnectionUrl,
 } from "../db/introspect.js";
+import { resolveDbPassword, saveDbPassword } from "../db/password.js";
 import { DB_TYPE_LIST, DEFAULT_PORTS, SUPPORTED_DB_TYPES } from "../db/schema.js";
 import { syncLocalConnector } from "../db/sync-connector.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
 import { getSavedClient } from "../sdk/client.js";
-import { promptLine, promptLineDefault, promptSecret } from "../util/prompt.js";
+import { promptLine, promptLineDefault } from "../util/prompt.js";
 
 interface ConnectorAddOptions {
 	name?: string;
@@ -52,6 +54,7 @@ interface ConnectorAddOptions {
 	password?: string;
 	database?: string;
 	ssl?: boolean;
+	savePassword?: boolean;
 	nonInteractive?: boolean;
 }
 
@@ -98,7 +101,7 @@ async function resolveConnection(opts: ConnectorAddOptions): Promise<ParsedConne
 	if (type === "sqlite") {
 		return resolveSqliteConnection(opts, nonInteractive);
 	}
-	return resolveNetworkConnection(opts, type, nonInteractive);
+	return resolveNetworkConnection(opts, name, type, nonInteractive);
 }
 
 async function resolveSqliteConnection(
@@ -139,6 +142,7 @@ function normalizeSqliteFile(raw: string): string {
 
 async function resolveNetworkConnection(
 	opts: ConnectorAddOptions,
+	name: string,
 	type: Exclude<ParsedConnection["type"], "sqlite">,
 	nonInteractive: boolean,
 ): Promise<ParsedConnection> {
@@ -173,14 +177,16 @@ async function resolveNetworkConnection(
 
 		let password = opts.password ?? "";
 		if (!password) {
-			if (nonInteractive) {
-				throw new CliError(
-					"--password is required in non-interactive mode (or set $EASYSQL_DB_PASSWORD).",
-					1,
-				);
-			}
-			const secret = await promptSecret(`${t().prompts.passwordPrompt}: `);
-			if (secret !== null) password = secret;
+			const resolved = await resolveDbPassword(name, {
+				prompt: nonInteractive ? async () => null : undefined,
+			});
+			password = resolved.password;
+		}
+		if (!password && nonInteractive) {
+			throw new CliError(
+				"--password is required in non-interactive mode (or set $EASYSQL_DB_PASSWORD).",
+				1,
+			);
 		}
 
 		conn = {
@@ -195,17 +201,29 @@ async function resolveNetworkConnection(
 	}
 
 	if (!conn.password) {
-		if (nonInteractive) {
+		const resolved = await resolveDbPassword(name, {
+			prompt: nonInteractive ? async () => null : undefined,
+		});
+		conn.password = resolved.password;
+		if (!conn.password && nonInteractive) {
 			throw new CliError(
 				"Database password is required (set $EASYSQL_DB_PASSWORD or use --password).",
 				1,
 			);
 		}
-		const secret = await promptSecret(`${t().prompts.passwordPrompt}: `);
-		if (secret !== null) conn.password = secret;
 	}
 
 	return conn;
+}
+
+/** Opt-in keyring persistence — failure is reported but never fatal. */
+async function storePassword(name: string, password: string): Promise<void> {
+	try {
+		await saveDbPassword(name, password);
+		printInfo(t().success.passwordSavedKeyring(name));
+	} catch (err) {
+		printError(t().errors.keyringSaveFailed(err instanceof Error ? err.message : String(err)));
+	}
 }
 
 function persistConnector(opts: ConnectorAddOptions, conn: ParsedConnection): StoredConnectorView {
@@ -248,6 +266,7 @@ function registerAdd(program: Command): void {
 		.option("--password <pass>", "Database password (otherwise prompted)")
 		.option("--database <db>", "Database name")
 		.option("--ssl", "Require SSL/TLS")
+		.option("--save-password", "Persist the password in the OS keyring (never sent to the API)")
 		.option("-y, --non-interactive", "Disable prompts; fail when required values are missing")
 		.action(async (opts: ConnectorAddOptions) => {
 			let conn: ParsedConnection;
@@ -270,11 +289,16 @@ function registerAdd(program: Command): void {
 			})) as { id?: string; name?: string };
 
 			const entry = persistConnector(opts, conn);
+			const finalName = result.name ?? opts.name ?? entry.name;
 			upsertConnector({
 				...entry,
 				id: result.id,
-				name: result.name ?? opts.name ?? entry.name,
+				name: finalName,
 			});
+
+			if (opts.savePassword && conn.password && conn.type !== "sqlite") {
+				await storePassword(finalName, conn.password);
+			}
 
 			printSuccess(
 				t().success.connectorAdded(result.name ?? opts.name ?? "", result.id ?? ""),
@@ -288,11 +312,17 @@ function registerSync(program: Command): void {
 		.description("Re-introspect a local connector and push the updated schema")
 		.option("--id <id>", "Sync a specific connector by id")
 		.option("--password <pass>", "Database password (otherwise $EASYSQL_DB_PASSWORD or prompt)")
+		.option("--save-password", "Persist the password in the OS keyring (never sent to the API)")
 		.option("-y, --non-interactive", "Disable prompts; fail when the password is missing")
 		.action(
 			async (
 				name: string | undefined,
-				opts: { id?: string; password?: string; nonInteractive?: boolean },
+				opts: {
+					id?: string;
+					password?: string;
+					savePassword?: boolean;
+					nonInteractive?: boolean;
+				},
 			) => {
 				let stored = opts.id
 					? findConnectorById(opts.id)
@@ -319,7 +349,14 @@ function registerSync(program: Command): void {
 
 				let password = "";
 				if (stored.type !== "sqlite") {
-					password = opts.password ?? process.env.EASYSQL_DB_PASSWORD ?? "";
+					if (opts.password && opts.password.length > 0) {
+						password = opts.password;
+					} else {
+						const resolved = await resolveDbPassword(stored.name, {
+							prompt: opts.nonInteractive ? async () => null : undefined,
+						});
+						password = resolved.password;
+					}
 					if (!password) {
 						if (opts.nonInteractive) {
 							throw new CliError(
@@ -327,14 +364,15 @@ function registerSync(program: Command): void {
 								1,
 							);
 						}
-						const secret = await promptSecret(`${t().prompts.passwordPrompt}: `);
-						if (!secret) throw new CliError("Database password required.", 1);
-						password = secret;
+						throw new CliError("Database password required.", 1);
 					}
 				}
 
 				printInfo(t().info.introspectingDb);
 				const result = await syncLocalConnector(stored, password);
+				if (opts.savePassword && password && stored.type !== "sqlite") {
+					await storePassword(stored.name, password);
+				}
 				printSuccess(t().success.connectorSynced(stored.name, result.tables ?? 0));
 			},
 		);
@@ -376,6 +414,11 @@ function registerRemove(program: Command): void {
 			}
 
 			removeConnector(name);
+			try {
+				await keyringDelete(name);
+			} catch {
+				// best-effort: a leftover keyring entry is harmless
+			}
 			printSuccess(t().success.connectorRemoved(name));
 		});
 }

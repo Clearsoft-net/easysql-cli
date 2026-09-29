@@ -30,6 +30,8 @@ export const MESSAGES = {
 				`No release asset matches your platform (${platform}).`,
 			updateAlreadyLatest: (current: string, latest: string) =>
 				`Already on the latest version (current: ${current}, latest: ${latest}).`,
+			keyringSaveFailed: (msg: string) =>
+				`Could not save the password to the OS keyring: ${msg}`,
 		},
 		prompts: {
 			passwordPrompt: "Password",
@@ -53,6 +55,8 @@ export const MESSAGES = {
 			connectorRemoved: (name: string) => `Connector '${name}' removed.`,
 			connectorSynced: (name: string, tables: number) =>
 				`Synced '${name}' (${tables} table${tables === 1 ? "" : "s"}).`,
+			passwordSavedKeyring: (name: string) =>
+				`Password for '${name}' saved in the OS keyring.`,
 			queryDone: (rows: number) => `Returned ${rows} row(s).`,
 			updated: (from: string, to: string) => `Updated ${from} → ${to}.`,
 			updateAlreadyLatest: (current: string, latest: string) =>

@@ -13,6 +13,7 @@ import {
 	upsertConnector,
 } from "../config/connectors-store.js";
 import { executeSelect } from "../db/execute.js";
+import { resolveDbPassword } from "../db/password.js";
 import { appendHistory } from "../history/store.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
@@ -130,9 +131,9 @@ export function registerQuery(program: Command): void {
 					host: local.host,
 					port: local.port,
 					user: local.user,
-					// Re-prompt for the password since we never persist it.
-					// SQLite connectors have no credentials — skip the prompt.
-					password: local.type === "sqlite" ? "" : await readPasswordInteractive(),
+					// Resolution chain: $EASYSQL_DB_PASSWORD > OS keyring > prompt.
+					// SQLite connectors have no credentials — skip the chain.
+					password: local.type === "sqlite" ? "" : await readPassword(local.name),
 					database: local.database,
 					ssl: local.ssl,
 				},
@@ -173,16 +174,10 @@ export function registerQuery(program: Command): void {
 		});
 }
 
-async function readPasswordInteractive(): Promise<string> {
-	const env = process.env.EASYSQL_DB_PASSWORD;
-	if (env && env.length > 0) return env;
-	// The password is required to actually execute the SQL — without a
-	// stored password the CLI must ask every time. This is by design
-	// (security): never persist database credentials to disk.
-	const { promptSecret } = await import("../util/prompt.js");
-	const secret = await promptSecret(`${t().prompts.passwordPrompt}: `);
-	if (secret === null || secret.length === 0) {
+async function readPassword(connectorName: string): Promise<string> {
+	const { password } = await resolveDbPassword(connectorName);
+	if (password.length === 0) {
 		throw new CliError("Database password required to execute the query.", 1);
 	}
-	return secret;
+	return password;
 }

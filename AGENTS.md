@@ -18,7 +18,7 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLi
 - **Output:** `chalk 5` (auto-detect TTY), custom table renderer
 - **Lint/format:** Biome 2.5 (`biome.json`, tabs, 100 col, LF, double quotes)
 - **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` in dev) — running `easysql` with no subcommand opens React in the terminal
-- **Tests:** `bun test` (142 specs, no vitest dependency)
+- **Tests:** `bun test` (165 specs, no vitest dependency)
 - **Build:**
   - `bun run build` → `tsc -p scripts/tsconfig.json` → `dist/`
   - `bun run build:compile` → `bun build --compile --minify` → `bin/easysql` (standalone ~92 MB)
@@ -30,8 +30,8 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLi
 | `easysql login` | Authenticates with an API key (`--api-key` / `$EASYSQL_API_KEY` / `--non-interactive`, -y) |
 | `easysql logout` | Clears local credentials |
 | `easysql demo` | Generates a local sample SQLite database and registers it as `local-demo` |
-| `easysql connector add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/clickhouse/sqlite) |
-| `easysql connector sync [name]` | Re-introspects and re-sends the schema (`syncConnector`); with no name, uses the single local connector |
+| `easysql connector add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/clickhouse/sqlite); `--save-password` persists the password in the OS keyring |
+| `easysql connector sync [name]` | Re-introspects and re-sends the schema (`syncConnector`); with no name, uses the single local connector; `--save-password` persists the password in the OS keyring |
 | `easysql connector list` | Lists connectors known to the API |
 | `easysql connector remove <name>` | Removes the connector server-side (best-effort) and locally (`--yes` skips confirmation) |
 | `easysql query "<q>"` | Generates SQL and executes it locally (SELECT-only) |
@@ -70,13 +70,15 @@ src/
 ├── config/
 │   ├── paths.ts                # XDG-aware: getConfigDir/getConfigPath/getDataDir/getHistoryPath
 │   ├── store.ts                # loadConfig/saveConfig/clearConfig/isLoggedIn (0600)
-│   └── connectors-store.ts     # CRUD for local connectors (0600, no password)
+│   ├── connectors-store.ts     # CRUD for local connectors (0600, no password)
+│   └── keyring.ts              # OS keyring shell-out (security/secret-tool/PowerShell) — opt-in password store
 ├── db/
 │   ├── schema.ts               # re-exports schema types from @easysql/common + SUPPORTED_DB_TYPES/DEFAULT_PORTS
 │   ├── introspect.ts           # dispatcher over @easysql/connector-* + generateSchema()
 │   ├── introspect-sqlite.ts    # thin SqliteConnector wrapper (kept for existing imports)
 │   ├── demo.ts                 # buildDemoDatabase() — sample customers/products/orders
 │   ├── parse-url.ts            # re-exports parseConnectionUrl()/mergeConnection() from @easysql/common
+│   ├── password.ts             # resolveDbPassword/storedPassword — env > keyring > prompt
 │   ├── sync-connector.ts       # syncLocalConnector() — re-introspect + POST /sync
 │   └── execute.ts              # executeSelect() via @easysql/connector-*, validateSelectOnly() first
 ├── sdk/
@@ -126,7 +128,7 @@ tests/                          # bun:test — one file per module + _helpers.ts
 
 - **Schema-only:** `introspectDatabase()` returns only `{tables, columns, types, pks, fks, rows_approx}`.
   Passwords, hosts, and ports NEVER cross the process boundary.
-- **Password never persisted.** `$XDG_CONFIG_HOME/easysql/connectors.json` stores only `name/type/host/port/user/database/ssl` plus `owner` (the account email that registered it). The password is re-prompted (or read from `$EASYSQL_DB_PASSWORD`) on every query run.
+- **Password never in `connectors.json`.** The store holds only `name/type/host/port/user/database/ssl` plus `owner` (the account email that registered it). Locally the password is resolved as `$EASYSQL_DB_PASSWORD` → OS keyring → prompt (`src/db/password.ts`); persistence in the keyring is opt-in via `connector add|sync --save-password`. The keyring (`src/config/keyring.ts`) shells out to `security`/`secret-tool`/PowerShell — no native addons, so it works under Node, Bun and the compiled binary; `EASYSQL_KEYRING=0` disables it.
 - **API key in `config.json` with `0600`.** chmod is best-effort on Windows.
 - **Local SQL validator** (`src/util/sql-validator.ts`): tokenizer + regex, applied before touching the local DB. The server side already enforces this; this is defense in depth.
 - **Stacked statements rejected**, only one trailing `;` allowed, the head must be `WITH|SELECT|EXPLAIN|SHOW`.
@@ -210,10 +212,10 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 - Renders in the **alternate screen buffer** (vim/htop-style: fills the terminal and restores scrollback on exit). `mountTui` forces `interactive: true` in ink's `render()` — its auto-detection disables EVERYTHING if the `CI` env var is present in the user's shell (even on a real TTY), which made the TUI draw nothing and leave a black hole above the last frame. The `isatty()` gate in `repl.ts` already guarantees we only run on a TTY.
 - **Shortcut model:** `Tab` / `Shift-Tab` cycle Connectors → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
 - The **Question** screen uses a local `useInput` to build the text buffer and calls the same domain pipeline (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — no duplicated logic.
-- **DB password in the TUI is always an inline field**, never `promptSecret`: for non-SQLite connectors the Question screen renders a `Password for <name>` input (masked, `Enter` executes, `Esc` cancels) after the API returns the SQL. A raw-mode `promptSecret` on stderr is erased by ink's alternate-screen redraws and looked like a hang. `$EASYSQL_DB_PASSWORD` bypasses the prompt. The sync runner (`<ConnectorSync>`) uses the same inline pattern.
+- **DB password in the TUI is always an inline field**, never `promptSecret`: for non-SQLite connectors the Question screen renders a `Password for <name>` input (masked, `Enter` executes, `Esc` cancels) after the API returns the SQL — but only when the resolution chain (`storedPassword()`: `$EASYSQL_DB_PASSWORD` → OS keyring) came up empty. A raw-mode `promptSecret` on stderr is erased by ink's alternate-screen redraws and looked like a hang. The sync runner (`<ConnectorSync>`) uses the same pattern.
 - Keybindings:
   - Connectors: `j/k` or `↑/↓` navigate; `Enter` activates the highlighted connector or opens the add form when the last row ("+ Add a connector…") is selected; `s` syncs the highlighted connector; `d`/Del removes (confirm with `y`/Enter). In the form: `↑/↓` field, `←/→` type/SSL, `Enter` saves, `Esc` cancels.
-  - Sync (Connectors `s` and Question `/sync`): `<ConnectorSync>` (`src/tui/screens/connector-sync.tsx`) re-introspects and calls `syncLocalConnector`; asks for an inline password for MySQL/Postgres/ClickHouse (uses `$EASYSQL_DB_PASSWORD` if set), SQLite does not need one.
+  - Sync (Connectors `s` and Question `/sync`): `<ConnectorSync>` (`src/tui/screens/connector-sync.tsx`) re-introspects and calls `syncLocalConnector`; resolves the password via `storedPassword()` (env > keyring) and asks inline only when both are empty, SQLite does not need one.
   - History: `h/l` or `←/→` paginate
   - Question: type the question, `Enter` submits, `Backspace` deletes; `/usage` shows plan/quota
   - Globals: `Tab` (next screen), `Shift-Tab` (previous), `Ctrl-C` (quit), `Esc` (close overlay)
@@ -231,6 +233,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 | Add a DB driver | new `@easysql/connector-*` dep (optionalDep if not SQLite) + `SUPPORTED_DB_TYPES`/`DEFAULT_PORTS` in `src/db/schema.ts` + `StoredConnector` in `src/config/connectors-store.ts` + `load-*`/case in `src/db/load-connector.ts`, `src/db/introspect.ts`, `src/db/execute.ts` + `ALLOWED_TYPES` in `src/commands/connector.ts` + `TYPES` in `src/tui/screens/connectors.tsx` |
 | Add an API endpoint | `RawSdk` + `AuthenticatedClient` + `getAuthenticatedClient` in `src/sdk/client.ts` |
 | Change the persisted schema | `StoredConnector` in `src/config/connectors-store.ts` (migrate manually — no migration runner) |
+| Password/secret storage | `src/config/keyring.ts` (backend per OS) + resolution chain in `src/db/password.ts` |
 | Add a history entry | `HistoryEntry` in `src/history/store.ts` + write in `appendHistory` from the command |
 
 ## Local verification
@@ -238,7 +241,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 ```bash
 bun install --frozen-lockfile   # the lockfile is mandatory in CI
 bun run check                   # biome + tsc --noEmit (lint+typecheck)
-bun test                        # 142 specs (sqlite + demo + TUI included)
+bun test                        # 165 specs (sqlite + demo + TUI included)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
 make deb                        # .deb package for the host arch (ARCH=arm64 to cross-build)
@@ -250,7 +253,7 @@ make rpm                        # .rpm package for the host arch (ARCH=arm64 to 
 
 ## Current state
 
-- 142/142 tests passing (`bun test`).
+- 165/165 tests passing (`bun test`).
 - `bun run check` clean (minor `noExplicitAny` warnings in the SDK wrapper and 1 `useImportType` — non-blocking).
 - Standalone binary `bin/easysql` already built (~92 MB).
 - `bin/` and `dist/` are in `.gitignore` — do not commit.

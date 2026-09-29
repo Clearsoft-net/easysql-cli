@@ -86,8 +86,10 @@ Usage: easysql connector add [options]
 Connect to a LOCAL MySQL, PostgreSQL, ClickHouse or SQLite database,
 extract its schema (tables, columns, types, primary keys, foreign keys,
 row-count estimates), and push ONLY the schema metadata to EasySQL.
-Connection credentials are NEVER sent to the API — they are kept in memory
-for the introspection step and discarded. SQLite connectors have no
+Connection credentials are NEVER sent to the API — only the schema is.
+The password stays in memory for the introspection step; persisting it
+locally in the OS keyring (Keychain / libsecret / Windows Credential
+Manager) is opt-in via --save-password. SQLite connectors have no
 credentials: the only required parameter is the absolute file path to a
 .db file.
 
@@ -117,6 +119,8 @@ SQLite-specific:
 
 Options:
   --ssl                 Require SSL/TLS (ClickHouse: HTTPS on 8443)
+  --save-password       Persist the password in the OS keyring (opt-in;
+                         never sent to the API, read back on query/sync)
   -y, --non-interactive  Disable prompts; fail when required values are missing
 
 Example:
@@ -144,7 +148,9 @@ Usage: easysql connector sync [name] [options]
 Re-introspect a locally-registered connector and push the updated schema
 metadata to EasySQL (POST /v1/connectors/{id}/sync). The local database is
 contacted again, so a password is required for MySQL/Postgres/ClickHouse
-connectors (SQLite has none); it is used in memory only and never persisted.
+connectors (SQLite has none); it is resolved from $EASYSQL_DB_PASSWORD,
+then the OS keyring, then a prompt. The password never reaches the API —
+persist it locally with --save-password.
 
 With no argument and exactly one local connector, that connector is synced.
 
@@ -153,7 +159,9 @@ Arguments:
 
 Options:
   --id <connector-id>   Sync a specific connector by server id
-  --password <pass>     Database password (otherwise $EASYSQL_DB_PASSWORD or prompted)
+  --password <pass>     Database password (otherwise $EASYSQL_DB_PASSWORD,
+                        the OS keyring, or prompted)
+  --save-password       Persist the password in the OS keyring (opt-in)
   -y, --non-interactive  Fail instead of prompting when the password is missing
 
 Example:

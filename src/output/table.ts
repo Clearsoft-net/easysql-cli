@@ -17,7 +17,6 @@ export function renderResult(
 			return JSON.stringify(rows, null, 2);
 		case "csv":
 			return renderCsv(columns, rows);
-		case "table":
 		default:
 			return renderTable(columns, rows);
 	}

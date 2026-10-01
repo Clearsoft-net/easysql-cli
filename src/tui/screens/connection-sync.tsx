@@ -1,5 +1,5 @@
 /**
- * Inline "sync connector" runner shared by the Connectors screen and the
+ * Inline "sync connection" runner shared by the Connections screen and the
  * Question screen (`/sync`). Re-introspects the local DB and pushes the
  * schema to EasySQL. For MySQL/Postgres/ClickHouse it resolves the password
  * via `$EASYSQL_DB_PASSWORD` > OS keyring and asks inline only when both
@@ -8,18 +8,18 @@
 
 import { Box, Text, useInput } from "ink";
 import { useEffect, useRef, useState } from "react";
-import type { StoredConnector } from "../../config/connectors-store.js";
+import type { StoredConnection } from "../../config/connections-store.js";
 import { storedPassword } from "../../db/password.js";
-import { syncLocalConnector } from "../../db/sync-connector.js";
+import { syncLocalConnection } from "../../db/sync-connection.js";
 
 interface Props {
-	connector: StoredConnector;
+	connection: StoredConnection;
 	title?: string;
 	onExit: () => void;
 }
 
-export function ConnectorSync({ connector, title = "Sync connector", onExit }: Props) {
-	const [needsPassword, setNeedsPassword] = useState(connector.type !== "sqlite");
+export function ConnectionSync({ connection, title = "Sync connection", onExit }: Props) {
+	const [needsPassword, setNeedsPassword] = useState(connection.type !== "sqlite");
 	const [ready, setReady] = useState(false);
 	const [password, setPassword] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -33,7 +33,7 @@ export function ConnectorSync({ connector, title = "Sync connector", onExit }: P
 		setError(null);
 		setStatus("Introspecting local schema…");
 		try {
-			const res = await syncLocalConnector(connector, pw);
+			const res = await syncLocalConnection(connection, pw);
 			const tables = res.tables;
 			setStatus(
 				`Synced${tables != null ? ` (${tables} table${tables === 1 ? "" : "s"})` : ""}.`,
@@ -50,12 +50,12 @@ export function ConnectorSync({ connector, title = "Sync connector", onExit }: P
 		if (started.current) return;
 		started.current = true;
 		void (async () => {
-			if (connector.type === "sqlite") {
+			if (connection.type === "sqlite") {
 				await run("");
 				setReady(true);
 				return;
 			}
-			const direct = await storedPassword(connector.name);
+			const direct = await storedPassword(connection);
 			if (direct) {
 				setNeedsPassword(false);
 				await run(direct);
@@ -97,7 +97,7 @@ export function ConnectorSync({ connector, title = "Sync connector", onExit }: P
 	return (
 		<Box flexDirection="column" paddingX={1}>
 			<Text bold color="cyan">
-				{title}: {connector.name}
+				{title}: {connection.name}
 			</Text>
 		{needsPassword && !done && (
 			<Text>

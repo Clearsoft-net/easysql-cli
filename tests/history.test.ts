@@ -31,13 +31,13 @@ describe("history store", () => {
 		const e1: HistoryEntry = {
 			at: "2026-09-07T10:00:00Z",
 			question: "first",
-			connector: "db",
+			connection: "db",
 			status: "ok",
 		};
 		const e2: HistoryEntry = {
 			at: "2026-09-07T11:00:00Z",
 			question: "second",
-			connector: "db",
+			connection: "db",
 			status: "generate-only",
 		};
 		appendHistory(e1);
@@ -54,7 +54,7 @@ describe("history store", () => {
 			appendHistory({
 				at: `2026-09-07T10:0${i}:00Z`,
 				question: `q${i}`,
-				connector: "db",
+				connection: "db",
 				status: "ok",
 			});
 		}
@@ -65,7 +65,7 @@ describe("history store", () => {
 		appendHistory({
 			at: "2026-09-07T10:00:00Z",
 			question: "x",
-			connector: "db",
+			connection: "db",
 			status: "ok",
 		});
 		expect(clearHistory()).toBe(true);
@@ -78,7 +78,7 @@ describe("history store", () => {
 		const path = join(tmp, "history.jsonl");
 		appendFileSync(
 			path,
-			`not json\n${JSON.stringify({ at: "2026-09-07T10:00:00Z", question: "x", connector: "db", status: "ok" })}\n`,
+			`not json\n${JSON.stringify({ at: "2026-09-07T10:00:00Z", question: "x", connection: "db", status: "ok" })}\n`,
 		);
 		const out = readHistory();
 		expect(out).toHaveLength(1);

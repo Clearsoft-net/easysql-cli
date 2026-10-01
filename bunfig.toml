@@ -1,2 +1,3 @@
 # bunfig.toml — see https://bun.sh/docs/runtime/bunfig
-# (placeholder — no overrides needed for now)
+[test]
+preload = ["./tests/setup.ts"]

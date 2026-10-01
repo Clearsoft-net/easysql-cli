@@ -1,6 +1,6 @@
 /**
  * Schema types — the JSON shape that the EasySQL API accepts on
- * `POST /v1/connectors` and `POST /v1/connectors/:id/sync`.
+ * `POST /v1/connections` and `POST /v1/connections/:id/sync`.
  *
  * Re-exported from @easysql/common so the CLI and the SDK share one
  * contract. `ConnectorSchema`/`DatabaseType` are local aliases kept for

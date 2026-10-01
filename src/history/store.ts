@@ -22,7 +22,7 @@ import { getHistoryPath } from "../config/paths.js";
 export interface HistoryEntry {
 	at: string;
 	question: string;
-	connector: string;
+	connection: string;
 	sql?: string;
 	row_count?: number;
 	duration_ms?: number;
@@ -52,7 +52,7 @@ function ensureFile(): void {
 export function appendHistory(entry: HistoryEntry): void {
 	ensureFile();
 	const path = getHistoryPath();
-	appendFileSync(path, JSON.stringify(entry) + "\n", { encoding: "utf8" });
+	appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: "utf8" });
 }
 
 export function readHistory(limit = 50): HistoryEntry[] {

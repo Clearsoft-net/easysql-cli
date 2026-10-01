@@ -1,58 +1,69 @@
 /**
- * Connectors screen — list of locally-registered connectors.
+ * Connections screen — list of locally-registered connections.
  *
  * List:      j/k or arrows move the selection; Enter activates the
- *            highlighted connector, or opens the add form when the last
- *            row ("+ Add a connector…") is selected; `d`/Del removes the
- *            highlighted connector (with confirmation).
- * Add form:  ↑/↓ move between fields; ←/→ cycle the type / toggle SSL;
- *            printable keys edit the focused field; Enter saves; Esc cancels.
- *            Adding introspects the LOCAL database and pushes only the
- *            schema to the API — the password is used in memory and is
- *            never persisted.
+ *            highlighted connection, or opens the add form when the last
+ *            row ("+ Add a connection…") is selected; `e` edits the highlighted
+ *            connection, `s` re-syncs it, `d`/Del removes it (confirmation).
+ * Add/edit:  ↑/↓ move between fields; ←/→ cycle the type / toggle the SSL
+ *            and "remember password" switches; printable keys edit the
+ *            focused field; Enter saves; Esc cancels. Both paths introspect
+ *            the LOCAL database and push only the schema to the API.
+ *            "Remember password" (on by default) persists the password in the
+ *            OS keyring, keyed by the connection's local uid — it is never
+ *            written to `connections.json` and never leaves the host. Editing
+ *            keeps the
+ *            name and type fixed (they are the API identity) and re-syncs the
+ *            schema; an empty password reuses the stored one.
  * Remove:    `y`/Enter confirms; `n`/Esc cancels. Deletes on the server
  *            (best-effort) and from the local store.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { Box, Text, useInput } from "ink";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ApiError, NotLoggedInError } from "../../cli/errors.js";
 import {
-	loadConnectors,
-	removeConnector,
-	type StoredConnector,
-	upsertConnector,
-} from "../../config/connectors-store.js";
+	loadConnections,
+	removeConnection,
+	type StoredConnection,
+	upsertConnection,
+} from "../../config/connections-store.js";
 import { introspectDatabase, type ParsedConnection } from "../../db/introspect.js";
+import { keyringDelete } from "../../config/keyring.js";
+import { type PasswordTarget, saveDbPassword, storedPassword } from "../../db/password.js";
+import { syncLocalConnection } from "../../db/sync-connection.js";
 import { DEFAULT_PORTS, SUPPORTED_DB_TYPES } from "../../db/schema.js";
 import { getSavedClient } from "../../sdk/client.js";
-import { ConnectorSync } from "./connector-sync.js";
+import { ConnectionSync } from "./connection-sync.js";
 
-type DbType = StoredConnector["type"];
+type DbType = StoredConnection["type"];
 
 interface Props {
 	active?: string;
 	onSelect: (name: string) => void;
 }
 
-function describe(c: StoredConnector): string {
+function describe(c: StoredConnection): string {
 	if (c.type === "sqlite") return `${c.type}@${c.database}`;
 	return `${c.type}@${c.host ?? "?"}:${c.port ?? "?"}/${c.database}`;
 }
 
-export function ConnectorsScreen({ active, onSelect }: Props) {
-	const [list, setList] = useState<StoredConnector[]>(() => loadConnectors());
+export function ConnectionsScreen({ active, onSelect }: Props) {
+	const [list, setList] = useState<StoredConnection[]>(() => loadConnections());
 	const [mode, setMode] = useState<"list" | "add">("list");
-	const [removing, setRemoving] = useState<StoredConnector | null>(null);
-	const [syncing, setSyncing] = useState<StoredConnector | null>(null);
+	const [editing, setEditing] = useState<StoredConnection | null>(null);
+	const [removing, setRemoving] = useState<StoredConnection | null>(null);
+	const [syncing, setSyncing] = useState<StoredConnection | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
 
-	const reload = () => setList(loadConnectors());
+	const reload = () => setList(loadConnections());
 
 	if (syncing) {
 		return (
-			<ConnectorSync
-				connector={syncing}
+			<ConnectionSync
+				connection={syncing}
 				onExit={() => {
 					reload();
 					setSyncing(null);
@@ -64,7 +75,7 @@ export function ConnectorsScreen({ active, onSelect }: Props) {
 	if (removing) {
 		return (
 			<RemoveConfirm
-				connector={removing}
+				connection={removing}
 				onCancel={() => setRemoving(null)}
 				onDone={() => {
 					reload();
@@ -74,24 +85,44 @@ export function ConnectorsScreen({ active, onSelect }: Props) {
 		);
 	}
 
+	const finish = (next: "add" | "list") => (notice?: string) => {
+		reload();
+		setNotice(notice ?? null);
+		if (next === "add") setMode("list");
+		else setEditing(null);
+	};
+
+	if (editing) {
+		return (
+			<ConnectionForm
+				mode="edit"
+				existing={editing}
+				existingNames={list.map((c) => c.name)}
+				onCancel={() => setEditing(null)}
+				onDone={finish("list")}
+			/>
+		);
+	}
+
 	if (mode === "add") {
 		return (
-			<ConnectorAddForm
+			<ConnectionForm
+				mode="add"
+				existingNames={list.map((c) => c.name)}
 				onCancel={() => setMode("list")}
-				onDone={() => {
-					reload();
-					setMode("list");
-				}}
+				onDone={finish("add")}
 			/>
 		);
 	}
 
 	return (
-		<ConnectorList
+		<ConnectionList
 			list={list}
 			active={active}
+			notice={notice}
 			onSelect={onSelect}
 			onAdd={() => setMode("add")}
+			onEdit={setEditing}
 			onRemove={setRemoving}
 			onSync={setSyncing}
 		/>
@@ -99,15 +130,26 @@ export function ConnectorsScreen({ active, onSelect }: Props) {
 }
 
 interface ListProps {
-	list: StoredConnector[];
+	list: StoredConnection[];
 	active?: string;
+	notice?: string | null;
 	onSelect: (name: string) => void;
 	onAdd: () => void;
-	onRemove: (c: StoredConnector) => void;
-	onSync: (c: StoredConnector) => void;
+	onEdit: (c: StoredConnection) => void;
+	onRemove: (c: StoredConnection) => void;
+	onSync: (c: StoredConnection) => void;
 }
 
-function ConnectorList({ list, active, onSelect, onAdd, onRemove, onSync }: ListProps) {
+function ConnectionList({
+	list,
+	active,
+	notice,
+	onSelect,
+	onAdd,
+	onEdit,
+	onRemove,
+	onSync,
+}: ListProps) {
 	const total = list.length + 1;
 	const addIndex = list.length;
 	const [cursor, setCursor] = useState(() =>
@@ -126,6 +168,9 @@ function ConnectorList({ list, active, onSelect, onAdd, onRemove, onSync }: List
 				const picked = list[cursor];
 				if (picked) onSelect(picked.name);
 			}
+		} else if (input === "e" && cursor < addIndex) {
+			const picked = list[cursor];
+			if (picked) onEdit(picked);
 		} else if (input === "s" && cursor < addIndex) {
 			const picked = list[cursor];
 			if (picked) onSync(picked);
@@ -137,8 +182,9 @@ function ConnectorList({ list, active, onSelect, onAdd, onRemove, onSync }: List
 
 	return (
 		<Box paddingX={1} flexDirection="column">
-			<Text bold>Connectors ({list.length})</Text>
-			{list.length === 0 && <Text dimColor>No local connectors yet.</Text>}
+			<Text bold>Connections ({list.length})</Text>
+			{notice && <Text color="yellow">{notice}</Text>}
+			{list.length === 0 && <Text dimColor>No local connections yet.</Text>}
 			{list.map((c, i) => {
 				const isActive = c.name === active;
 				const isCursor = i === cursor;
@@ -161,14 +207,16 @@ function ConnectorList({ list, active, onSelect, onAdd, onRemove, onSync }: List
 				bold={cursor === addIndex}
 				inverse={cursor === addIndex}
 			>
-				{cursor === addIndex ? "▶ " : "  "}+ Add a connector…
+				{cursor === addIndex ? "▶ " : "  "}+ Add a connection…
 			</Text>
-			<Text dimColor>↑/↓ or j/k to move · Enter select · s sync · d remove</Text>
+			<Text dimColor>
+				↑/↓ or j/k to move · Enter select · e edit · s sync · d remove
+			</Text>
 		</Box>
 	);
 }
 
-// --- add form -------------------------------------------------------------
+// --- add / edit form ------------------------------------------------------
 
 type FieldId =
 	| "name"
@@ -179,7 +227,8 @@ type FieldId =
 	| "user"
 	| "password"
 	| "database"
-	| "ssl";
+	| "ssl"
+	| "remember";
 
 interface FieldDef {
 	id: FieldId;
@@ -191,6 +240,18 @@ const TYPES: DbType[] = [...SUPPORTED_DB_TYPES];
 const DEFAULT_PORT: Record<DbType, string> = Object.fromEntries(
 	Object.entries(DEFAULT_PORTS).map(([type, port]) => [type, String(port)]),
 ) as Record<DbType, string>;
+
+/** Switch fields — cycled with ←/→ instead of typed into. */
+const SWITCHES: FieldId[] = ["type", "ssl", "remember"];
+
+function isSwitch(id: FieldId): boolean {
+	return SWITCHES.includes(id);
+}
+
+/** Name and type are the API identity — immutable once registered. */
+function isLocked(id: FieldId, mode: "add" | "edit"): boolean {
+	return mode === "edit" && (id === "name" || id === "type");
+}
 
 function fieldsFor(type: DbType): FieldDef[] {
 	if (type === "sqlite") {
@@ -207,6 +268,7 @@ function fieldsFor(type: DbType): FieldDef[] {
 		{ id: "port", label: "Port" },
 		{ id: "user", label: "User" },
 		{ id: "password", label: "Password", secret: true },
+		{ id: "remember", label: "Remember password" },
 		{ id: "database", label: "Database" },
 		{ id: "ssl", label: "SSL" },
 	];
@@ -222,18 +284,74 @@ const INITIAL_FORM: FormValues = {
 	port: "5432",
 	user: "",
 	password: "",
+	remember: "yes",
 	database: "",
 	ssl: "no",
 };
 
-function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: () => void }) {
-	const [form, setForm] = useState<FormValues>(INITIAL_FORM);
+/** Prefills the form from a registered connection (edit mode). */
+function formFrom(c: StoredConnection): FormValues {
+	return {
+		...INITIAL_FORM,
+		name: c.name,
+		type: c.type,
+		file: c.type === "sqlite" ? c.database : "",
+		host: c.host || "127.0.0.1",
+		port: String(c.port || DEFAULT_PORT[c.type]),
+		user: c.user,
+		database: c.type === "sqlite" ? "" : c.database,
+		ssl: c.ssl ? "yes" : "no",
+	};
+}
+
+interface FormProps {
+	mode: "add" | "edit";
+	existing?: StoredConnection;
+	/** Names already in use — a duplicate is rejected (name is the identity). */
+	existingNames: string[];
+	onCancel: () => void;
+	onDone: (notice?: string) => void;
+}
+
+function ConnectionForm({ mode, existing, existingNames, onCancel, onDone }: FormProps) {
+	const editing = mode === "edit";
+	const [form, setForm] = useState<FormValues>(() =>
+		existing ? formFrom(existing) : INITIAL_FORM,
+	);
 	const [cursor, setCursor] = useState(0);
 	const [busy, setBusy] = useState(false);
 	const [status, setStatus] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	const fields = fieldsFor(form.type as DbType);
+
+	// `name` is the identity in connections.json — a duplicate would silently
+	// overwrite the existing entry, so block it.
+	const trimmedName = form.name.trim();
+	const duplicate =
+		!editing && trimmedName.length > 0 && existingNames.includes(trimmedName);
+	const duplicateMessage = `A connection named '${trimmedName}' already exists.`;
+
+	/** Keyring persistence for the "Remember password" switch — never fatal. */
+	async function applyPasswordChoice(
+		target: PasswordTarget,
+		password: string,
+	): Promise<string | undefined> {
+		if (form.type === "sqlite") return undefined;
+		if (form.remember !== "yes") {
+			await keyringDelete(target.uid);
+			if (target.name !== target.uid) await keyringDelete(target.name);
+			return undefined;
+		}
+		if (!password) return undefined;
+		try {
+			await saveDbPassword(target, password);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			return `Connection saved, but the password was not stored: ${msg}`;
+		}
+		return undefined;
+	}
 
 	function update(id: FieldId, value: string): void {
 		setForm((f) => ({ ...f, [id]: value }));
@@ -248,9 +366,13 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 	async function submit(): Promise<void> {
 		if (busy) return;
 		setError(null);
-		const name = form.name.trim();
+		const name = editing ? (existing?.name ?? "") : form.name.trim();
 		if (name.length === 0) {
-			setError("Connector name is required.");
+			setError("Connection name is required.");
+			return;
+		}
+		if (duplicate) {
+			setError(duplicateMessage);
 			return;
 		}
 
@@ -301,18 +423,40 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 
 		setBusy(true);
 		try {
+			if (editing && existing) {
+				// An empty password reuses whatever the keyring already holds.
+				const password = form.password || (await storedPassword(existing)) || "";
+				const updated: StoredConnection = {
+					...existing,
+					type: conn.type,
+					host: conn.host,
+					port: conn.port,
+					user: conn.user,
+					database: conn.database,
+					ssl: conn.ssl,
+					updated_at: new Date().toISOString(),
+				};
+				setStatus("Introspecting local schema…");
+				await syncLocalConnection(updated, password);
+				onDone(await applyPasswordChoice(existing, form.password || password));
+				return;
+			}
+
 			setStatus("Introspecting local schema…");
 			const schema = await introspectDatabase(conn);
 			setStatus("Registering with EasySQL…");
 			const { client } = getSavedClient();
-			const result = (await client.createConnector({
+			const result = (await client.createConnection({
 				name,
 				type: conn.type,
 				schema,
 			})) as { id?: string; name?: string };
-			upsertConnector({
+			const finalName = result.name ?? name;
+			const uid = randomUUID();
+			upsertConnection({
+				uid,
 				id: result.id,
-				name: result.name ?? name,
+				name: finalName,
 				type: conn.type,
 				host: conn.host,
 				port: conn.port,
@@ -321,7 +465,7 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 				ssl: conn.ssl,
 				updated_at: new Date().toISOString(),
 			});
-			onDone();
+			onDone(await applyPasswordChoice({ uid, name: finalName }, conn.password));
 		} catch (e) {
 			setError(e instanceof Error ? e.message : String(e));
 			setBusy(false);
@@ -345,10 +489,15 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 		}
 		const field = fields[cursor];
 		if (!field) return;
+		const locked = isLocked(field.id, mode);
 		if (key.leftArrow || key.rightArrow) {
 			const step = key.leftArrow ? -1 : 1;
+			if (locked) return;
 			if (field.id === "type") cycleType(step);
 			else if (field.id === "ssl") update("ssl", form.ssl === "yes" ? "no" : "yes");
+			else if (field.id === "remember") {
+				update("remember", form.remember === "yes" ? "no" : "yes");
+			}
 			return;
 		}
 		if (key.return) {
@@ -356,13 +505,13 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 			return;
 		}
 		if (key.backspace || key.delete) {
-			if (field.id !== "type" && field.id !== "ssl") {
+			if (!locked && !isSwitch(field.id)) {
 				update(field.id, (form[field.id] ?? "").slice(0, -1));
 			}
 			return;
 		}
 		if (key.ctrl || key.meta || key.tab) return;
-		if (input && field.id !== "type" && field.id !== "ssl") {
+		if (input && !locked && !isSwitch(field.id)) {
 			update(field.id, (form[field.id] ?? "") + input);
 		}
 	});
@@ -370,37 +519,45 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 	return (
 		<Box paddingX={1} flexDirection="column">
 			<Text bold color="cyan">
-				Add connector
+				{editing ? "Edit connection" : "Add connection"}
 			</Text>
 			<Text> </Text>
 			{fields.map((field, i) => {
 				const isCursor = i === cursor;
 				const raw = form[field.id] ?? "";
 				const shown = field.secret ? "*".repeat(raw.length) : raw;
-		const editable = field.id !== "type" && field.id !== "ssl";
-		return (
-			<Text key={field.id} color={isCursor ? "cyan" : undefined} bold={isCursor}>
-				{isCursor ? "› " : "  "}
-				{field.label.padEnd(22)}
-				{field.id === "type" ? (
-					`< ${raw} >`
-				) : field.id === "ssl" ? (
-					raw === "yes" ? "[x] required" : "[ ] disabled"
-			) : shown.length === 0 ? (
-				<>{isCursor ? "▏" : "—"}</>
-			) : (
-					<>
-						{shown}
-						{isCursor && editable ? "▏" : ""}
-					</>
-				)}
-			</Text>
-		);
+				const locked = isLocked(field.id, mode);
+				const typeable = !isSwitch(field.id) && !locked;
+				let value: ReactNode;
+				if (field.id === "type") value = `< ${raw} >`;
+				else if (field.id === "ssl") value = raw === "yes" ? "[x] required" : "[ ] disabled";
+				else if (field.id === "remember") {
+					value = raw === "yes" ? "[x] saved in the OS keyring" : "[ ] do not save";
+				} else if (locked) value = raw;
+				else if (shown.length === 0) value = <>{isCursor ? "▏" : "—"}</>;
+				else
+					value = (
+						<>
+							{shown}
+							{isCursor && typeable ? "▏" : ""}
+						</>
+					);
+				return (
+					<Text key={field.id} color={isCursor ? "cyan" : undefined} bold={isCursor}>
+						{isCursor ? "› " : "  "}
+						{field.label.padEnd(22)}
+						{value}
+					</Text>
+				);
 			})}
 			<Text> </Text>
+			{editing && form.type !== "sqlite" && (
+				<Text dimColor>Leave Password empty to keep the stored one.</Text>
+			)}
+			{duplicate && <Text color="yellow">Warning: {duplicateMessage}</Text>}
 			{status && <Text color="cyan">{status}</Text>}
 			{error && <Text color="red">Error: {error}</Text>}
-			<Text dimColor>↑/↓ field · ←/→ type/ssl · Enter save · Esc cancel</Text>
+			<Text dimColor>↑/↓ field · ←/→ switch · Enter save · Esc cancel</Text>
 		</Box>
 	);
 }
@@ -408,11 +565,11 @@ function ConnectorAddForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
 // --- remove confirmation --------------------------------------------------
 
 function RemoveConfirm({
-	connector,
+	connection,
 	onCancel,
 	onDone,
 }: {
-	connector: StoredConnector;
+	connection: StoredConnection;
 	onCancel: () => void;
 	onDone: () => void;
 }) {
@@ -423,10 +580,10 @@ function RemoveConfirm({
 		if (busy) return;
 		setBusy(true);
 		try {
-			if (connector.id) {
+			if (connection.id) {
 				try {
 					const { client } = getSavedClient();
-					await client.deleteConnector(connector.id);
+					await client.deleteConnection(connection.id);
 				} catch (e) {
 					if (e instanceof ApiError && e.status === 404) {
 						// Already gone server-side — proceed with the local cleanup.
@@ -437,7 +594,9 @@ function RemoveConfirm({
 					}
 				}
 			}
-			removeConnector(connector.name);
+			removeConnection(connection.name);
+			await keyringDelete(connection.uid);
+			if (connection.name !== connection.uid) await keyringDelete(connection.name);
 			onDone();
 		} catch (e) {
 			setError(e instanceof Error ? e.message : String(e));
@@ -459,11 +618,11 @@ function RemoveConfirm({
 	return (
 		<Box paddingX={1} flexDirection="column">
 			<Text bold color="yellow">
-				Remove connector
+				Remove connection
 			</Text>
 			<Text> </Text>
 			<Text>
-				Delete <Text bold>{connector.name}</Text> ({describe(connector)})?
+				Delete <Text bold>{connection.name}</Text> ({describe(connection)})?
 			</Text>
 			<Text dimColor>It will be deleted from EasySQL and locally.</Text>
 			<Text> </Text>

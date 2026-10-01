@@ -41,7 +41,7 @@ export function printError(message: string): void {
 		console.log(JSON.stringify({ error: message }, null, 2));
 		return;
 	}
-	console.error(chalk.red("✗") + " " + message);
+	console.error(`${chalk.red("✗")} ${message}`);
 }
 
 export function printSuccess(message: string): void {
@@ -49,10 +49,10 @@ export function printSuccess(message: string): void {
 		console.log(JSON.stringify({ ok: true, message }, null, 2));
 		return;
 	}
-	console.log(chalk.green("✓") + " " + message);
+	console.log(`${chalk.green("✓")} ${message}`);
 }
 
 export function printInfo(message: string): void {
 	if (jsonMode) return; // suppress chatter in JSON mode
-	console.log(chalk.cyan("ℹ") + " " + message);
+	console.log(`${chalk.cyan("ℹ")} ${message}`);
 }

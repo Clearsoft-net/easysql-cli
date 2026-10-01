@@ -8,7 +8,7 @@
  *
  * Usage:
  *   bun run scripts/tui-capture.ts                       # default Question screen
- *   bun run scripts/tui-capture.ts '$Tab'                # switch to Connectors
+ *   bun run scripts/tui-capture.ts '$Tab'                # switch to Connections
  *   bun run scripts/tui-capture.ts '$/' help '$Enter'    # open the help modal
  *   bun run scripts/tui-capture.ts --size 100x24 '$Tab' '$Tab'
  *   bun run scripts/tui-capture.ts --png /tmp/tui.png    # render a screenshot

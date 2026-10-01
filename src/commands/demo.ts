@@ -1,19 +1,19 @@
 /**
  * `easysql demo` — generate a local sample SQLite database and register
- * it as a connector named `local-demo`. The generated file lives in the
+ * it as a connection named `local-demo`. The generated file lives in the
  * user's data directory and is fully deterministic: re-running the
  * command removes and recreates it.
  *
  * This is a low-friction on-ramp for users who don't yet have a database
  * to point the CLI at — they can run `easysql demo && easysql query "..."
- * --connector local-demo` and see the end-to-end flow without setting up
+ * --connection local-demo` and see the end-to-end flow without setting up
  * MySQL or PostgreSQL.
  */
 
 import { join } from "node:path";
 import type { Command } from "commander";
 import { CliError } from "../cli/errors.js";
-import { upsertConnector } from "../config/connectors-store.js";
+import { upsertConnection } from "../config/connections-store.js";
 import { getDataDir } from "../config/paths.js";
 import { buildDemoDatabase, DEMO_CONNECTOR_NAME } from "../db/demo.js";
 import { introspectDatabase } from "../db/introspect.js";
@@ -32,8 +32,8 @@ export function registerDemo(program: Command): void {
 		.command("demo")
 		.description("Generate a local sample SQLite database and register it as `local-demo`")
 		.option("--file <path>", "Override the path of the generated SQLite file")
-		.option("--name <name>", "Override the connector name (default: local-demo)")
-		.option("--no-register", "Generate the file only, skip the API/connectors-store step")
+		.option("--name <name>", "Override the connection name (default: local-demo)")
+		.option("--no-register", "Generate the file only, skip the API/connections-store step")
 		.option("--force", "Overwrite the existing local-demo file (default: true)")
 		.action(async (opts: DemoOptions) => {
 			const file = opts.file ?? join(getDataDir(), "demo.db");
@@ -63,7 +63,7 @@ export function registerDemo(program: Command): void {
 			let apiId: string | undefined;
 			try {
 				const { client } = getSavedClient();
-				const result = (await client.createConnector({
+				const result = (await client.createConnection({
 					name,
 					type: "sqlite",
 					schema,
@@ -80,7 +80,7 @@ export function registerDemo(program: Command): void {
 				);
 			}
 
-			upsertConnector({
+			upsertConnection({
 				id: apiId,
 				name,
 				type: "sqlite",
@@ -93,9 +93,9 @@ export function registerDemo(program: Command): void {
 			});
 
 			printSuccess(
-				`Demo ready. Connector '${name}' → ${built.file}\n` +
+				`Demo ready. Connection '${name}' → ${built.file}\n` +
 					`  Tables: ${built.tables.join(", ")}\n` +
-					`  Try: easysql query "Top 3 customers by revenue" --connector ${name}`,
+					`  Try: easysql query "Top 3 customers by revenue" --connection ${name}`,
 			);
 		});
 }

@@ -18,15 +18,14 @@ interface RawSdk {
 	listApiKeys: SdkMethod<unknown>;
 	createApiKey: SdkMethod<unknown>;
 	deleteApiKey: SdkMethod<unknown>;
-	listConnectors: SdkMethod<unknown>;
-	createConnector: SdkMethod<unknown>;
-	updateConnector: SdkMethod<unknown>;
-	deleteConnector: SdkMethod<unknown>;
-	getConnectorSchema: SdkMethod<unknown>;
-	syncConnector: SdkMethod<unknown>;
+	listConnections: SdkMethod<unknown>;
+	createConnection: SdkMethod<unknown>;
+	updateConnection: SdkMethod<unknown>;
+	deleteConnection: SdkMethod<unknown>;
+	getConnectionSchema: SdkMethod<unknown>;
+	syncConnection: SdkMethod<unknown>;
 	createQuery: SdkMethod<unknown>;
 	getQuery: SdkMethod<unknown>;
-	answerQuery: SdkMethod<unknown>;
 	listQueries: SdkMethod<unknown>;
 	dashboardStats: SdkMethod<unknown>;
 }
@@ -72,13 +71,13 @@ export function apiErrorFromResult(result: {
 }
 
 /**
- * True when the API reports that the connector referenced by the request does
- * not exist for the authenticated user. This happens when the local
- * `connectors.json` still holds a connector id from a previous account (the
+ * True when the API reports that the connection referenced by the request does
+ * not exist for the current account. This happens when the local
+ * `connections.json` still holds a connection id from a previous account (the
  * store is not scoped per user), and it needs an explicit re-registration.
  */
-export function isConnectorNotFoundError(err: unknown): boolean {
-	return err instanceof ApiError && err.status === 404 && /connector/i.test(err.message);
+export function isConnectionNotFoundError(err: unknown): boolean {
+	return err instanceof ApiError && err.status === 404 && /connection/i.test(err.message);
 }
 
 async function call<T>(fn: () => Promise<SdkResult<T>>): Promise<T> {
@@ -161,15 +160,14 @@ export interface AuthenticatedClient {
 	listApiKeys: () => Promise<unknown>;
 	createApiKey: (body: unknown) => Promise<unknown>;
 	deleteApiKey: (id: string) => Promise<unknown>;
-	listConnectors: () => Promise<unknown>;
-	createConnector: (body: unknown) => Promise<unknown>;
-	updateConnector: (body: unknown, id: string) => Promise<unknown>;
-	deleteConnector: (id: string) => Promise<void>;
-	getConnectorSchema: (id: string) => Promise<unknown>;
-	syncConnector: (body: unknown, id: string) => Promise<unknown>;
+	listConnections: () => Promise<unknown>;
+	createConnection: (body: unknown) => Promise<unknown>;
+	updateConnection: (body: unknown, id: string) => Promise<unknown>;
+	deleteConnection: (id: string) => Promise<void>;
+	getConnectionSchema: (id: string) => Promise<unknown>;
+	syncConnection: (body: unknown, id: string) => Promise<unknown>;
 	createQuery: (body: unknown) => Promise<unknown>;
 	getQuery: (id: string) => Promise<unknown>;
-	answerQuery: (body: unknown, id: string) => Promise<unknown>;
 	listQueries: (params: { page?: number; per_page?: number }) => Promise<unknown>;
 	dashboardStats: () => Promise<unknown>;
 }
@@ -181,19 +179,20 @@ export function getAuthenticatedClient(apiKey: string, apiUrl: string): Authenti
 		listApiKeys: () => call(() => sdk.listApiKeys()),
 		createApiKey: (body) => call(() => sdk.createApiKey(body as never)),
 		deleteApiKey: (id) => call(() => sdk.deleteApiKey({ key_id: id } as never)),
-		listConnectors: () => call(() => sdk.listConnectors()),
-		createConnector: (body) => call(() => sdk.createConnector(body as never)),
-		updateConnector: (body, id) =>
-			call(() => sdk.updateConnector(body as never, { path: { connector_id: id } } as never)),
-		deleteConnector: (id) => callVoid(() => sdk.deleteConnector({ connector_id: id } as never)),
-		getConnectorSchema: (id) =>
-			call(() => sdk.getConnectorSchema({ connector_id: id } as never)),
-		syncConnector: (body, id) =>
-			call(() => sdk.syncConnector(body as never, { path: { connector_id: id } } as never)),
+		listConnections: () => call(() => sdk.listConnections()),
+		createConnection: (body) => call(() => sdk.createConnection(body as never)),
+		updateConnection: (body, id) =>
+			call(() =>
+				sdk.updateConnection(body as never, { path: { connection_id: id } } as never),
+			),
+		deleteConnection: (id) =>
+			callVoid(() => sdk.deleteConnection({ connection_id: id } as never)),
+		getConnectionSchema: (id) =>
+			call(() => sdk.getConnectionSchema({ connection_id: id } as never)),
+		syncConnection: (body, id) =>
+			call(() => sdk.syncConnection(body as never, { path: { connection_id: id } } as never)),
 		createQuery: (body) => call(() => sdk.createQuery(body as never)),
 		getQuery: (id) => call(() => sdk.getQuery({ query_id: id } as never)),
-		answerQuery: (body, id) =>
-			call(() => sdk.answerQuery(body as never, { path: { query_id: id } } as never)),
 		listQueries: (params) =>
 			call(() => sdk.listQueries({ page: params.page, per_page: params.per_page } as never)),
 		dashboardStats: () => call(() => sdk.dashboardStats()),

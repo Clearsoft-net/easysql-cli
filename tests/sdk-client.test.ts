@@ -1,16 +1,16 @@
 import { describe, expect, it } from "bun:test";
 import { ApiError } from "../src/cli/errors.js";
-import { apiErrorFromResult, isConnectorNotFoundError } from "../src/sdk/client.js";
+import { apiErrorFromResult, isConnectionNotFoundError } from "../src/sdk/client.js";
 
 describe("apiErrorFromResult", () => {
 	it("uses response.status and the FastAPI `detail` field", () => {
 		const e = apiErrorFromResult({
 			response: { status: 404 },
-			error: { detail: "Connector not found" },
+			error: { detail: "Connection not found" },
 		});
 		expect(e).toBeInstanceOf(ApiError);
 		expect(e.status).toBe(404);
-		expect(e.message).toBe("API error (404): Connector not found");
+		expect(e.message).toBe("API error (404): Connection not found");
 	});
 
 	it("falls back to `message` / `error` keys", () => {
@@ -35,13 +35,13 @@ describe("apiErrorFromResult", () => {
 	});
 });
 
-describe("isConnectorNotFoundError", () => {
-	it("matches a 404 whose message mentions the connector", () => {
+describe("isConnectionNotFoundError", () => {
+	it("matches a 404 whose message mentions the connection", () => {
 		const e = apiErrorFromResult({
 			response: { status: 404 },
-			error: { detail: "Connector not found" },
+			error: { detail: "Connection not found" },
 		});
-		expect(isConnectorNotFoundError(e)).toBe(true);
+		expect(isConnectionNotFoundError(e)).toBe(true);
 	});
 
 	it("ignores a 404 about another resource", () => {
@@ -49,19 +49,19 @@ describe("isConnectorNotFoundError", () => {
 			response: { status: 404 },
 			error: { detail: "Query not found" },
 		});
-		expect(isConnectorNotFoundError(e)).toBe(false);
+		expect(isConnectionNotFoundError(e)).toBe(false);
 	});
 
-	it("ignores non-404 connector errors", () => {
+	it("ignores non-404 connection errors", () => {
 		const e = apiErrorFromResult({
 			response: { status: 400 },
-			error: { detail: "Connector invalid" },
+			error: { detail: "Connection invalid" },
 		});
-		expect(isConnectorNotFoundError(e)).toBe(false);
+		expect(isConnectionNotFoundError(e)).toBe(false);
 	});
 
 	it("ignores non-ApiError values", () => {
-		expect(isConnectorNotFoundError(new Error("Connector not found"))).toBe(false);
-		expect(isConnectorNotFoundError(undefined)).toBe(false);
+		expect(isConnectionNotFoundError(new Error("Connection not found"))).toBe(false);
+		expect(isConnectionNotFoundError(undefined)).toBe(false);
 	});
 });

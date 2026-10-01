@@ -8,11 +8,11 @@ import { render } from "ink";
 import { App } from "./app.js";
 
 export interface MountOptions {
-	connector?: string;
+	connection?: string;
 }
 
 export function mountTui(opts: MountOptions) {
-	return render(<App initialConnector={opts.connector} />, {
+	return render(<App initialConnection={opts.connection} />, {
 		exitOnCtrlC: true,
 		patchConsole: true,
 		alternateScreen: true,

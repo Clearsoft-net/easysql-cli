@@ -3,7 +3,7 @@
  * (3-4 tables) using Node's built-in node:sqlite module (Node >=22.13 /
  * Bun >=1.4). Idempotent: the existing file is removed before regeneration
  * so a re-run resets the data deterministically. Intended for
- * `easysql demo`, which registers the resulting file as a local connector
+ * `easysql demo`, which registers the resulting file as a local connection
  * named `local-demo`.
  *
  * The schema is designed to look like a small e-commerce / product

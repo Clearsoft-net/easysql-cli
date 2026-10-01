@@ -1,7 +1,7 @@
 /**
  * Static chrome for the TUI shell — three components rendered around
  * the active screen slot: `Header` (status bar with name, version,
- * connector), `TabBar` (3 tabs with the active one highlighted), and
+ * connection), `TabBar` (3 tabs with the active one highlighted), and
  * `Footer` (contextual keybinding hints). Pure presentational; no
  * domain logic, no `useInput`.
  */
@@ -12,7 +12,7 @@ import type { ScreenName } from "./app.js";
 
 interface HeaderProps {
 	active?: string;
-	connectorType?: string;
+	connectionType?: string;
 	apiUrl?: string;
 	online?: boolean;
 	userEmail?: string;
@@ -22,13 +22,13 @@ interface HeaderProps {
 /**
  * Header — full-width banner above the tab bar. Three rows:
  *   1. easysql mark + tagline
- *   2. active connector (or "no connector selected")
+ *   2. active connection (or "no connection selected")
  *   3. API host + online/offline dot
  *
  * Two-column layout: left column is the brand, right column is the
  * status. Border is double to make it feel like a dashboard header.
  */
-export function Header({ active, connectorType, apiUrl, online, userEmail, planName }: HeaderProps) {
+export function Header({ active, connectionType, apiUrl, online, userEmail, planName }: HeaderProps) {
 	// Drop the least-important fields as the terminal narrows so the header
 	// never wraps into a broken second line. Email + plan + online are kept
 	// as long as there is room.
@@ -39,9 +39,9 @@ export function Header({ active, connectorType, apiUrl, online, userEmail, planN
 	const showVersion = cols >= 112;
 	const showApi = cols >= 140;
 
-	const connectorLabel = active
-		? `${active}${connectorType && showType ? ` (${connectorType})` : ""}`
-		: "no connector selected";
+	const connectionLabel = active
+		? `${active}${connectionType && showType ? ` (${connectionType})` : ""}`
+		: "no connection selected";
 
 	return (
 		<Box
@@ -63,9 +63,9 @@ export function Header({ active, connectorType, apiUrl, online, userEmail, planN
 			</Box>
 			<Box>
 				<Text>
-					<Text dimColor>connector: </Text>
+					<Text dimColor>connection: </Text>
 					<Text color={active ? "green" : "yellow"} bold={!active}>
-						{connectorLabel}
+						{connectionLabel}
 					</Text>
 				</Text>
 				<Text dimColor>{"  │  plan: "}</Text>
@@ -94,7 +94,7 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-	{ name: "Connectors", value: "connectors" },
+	{ name: "Connections", value: "connections" },
 	{ name: "History", value: "history" },
 	{ name: "Question", value: "question" },
 ];
@@ -137,7 +137,7 @@ interface FooterProps {
 const GLOBAL_HINTS = "[Tab] next screen · Shift+Tab previous · [/] commands · [Ctrl-C] quit";
 
 const SCREEN_HINTS: Record<ScreenName, string> = {
-	connectors: "↑/↓ or j/k navigate · Enter select · s sync · d remove",
+	connections: "↑/↓ or j/k navigate · Enter select · s sync · d remove",
 	history: "←/→ or h/l switch page",
 	question: "Type · Enter submit · Backspace delete · / for commands",
 };

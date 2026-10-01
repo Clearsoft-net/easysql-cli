@@ -6,44 +6,45 @@
  */
 
 import type { Command } from "commander";
-import { ApiError, CliError } from "../cli/errors.js";
+import { CliError } from "../cli/errors.js";
 import {
-	findConnectorByName,
-	loadConnectors,
-	upsertConnector,
-} from "../config/connectors-store.js";
+	findConnectionByName,
+	loadConnections,
+	type StoredConnection,
+	upsertConnection,
+} from "../config/connections-store.js";
 import { executeSelect } from "../db/execute.js";
 import { resolveDbPassword } from "../db/password.js";
 import { appendHistory } from "../history/store.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
 import { renderResult } from "../output/table.js";
-import { getSavedClient, isConnectorNotFoundError } from "../sdk/client.js";
+import { getSavedClient, isConnectionNotFoundError } from "../sdk/client.js";
 import { promptLine } from "../util/prompt.js";
 
 interface QueryOptions {
-	connector?: string;
+	connection?: string;
 	generateOnly?: boolean;
 	rows?: number;
 	format?: string;
 }
 
-async function pickConnector(picked: string | undefined): Promise<{ id: string; name: string }> {
-	const list = loadConnectors();
+async function pickConnection(picked: string | undefined): Promise<{ id: string; name: string }> {
+	const list = loadConnections();
 	if (list.length === 0) {
 		throw new CliError(
-			"No local connectors registered. Run `easysql connector add ...` first.",
+			"No local connections registered. Run `easysql connection add ...` first.",
 			1,
 		);
 	}
 	if (picked) {
-		const byName = findConnectorByName(picked);
+		const byName = findConnectionByName(picked);
 		if (byName?.id) return { id: byName.id, name: byName.name };
 		// Allow bare ID
 		const byId = list.find((c) => c.id === picked);
 		if (byId?.id) return { id: byId.id, name: byId.name };
 		throw new CliError(
-			`No local connector named '${picked}'. Run \`easysql connector list\`.`,
+			`No local connection named '${picked}'. Run \`easysql connection list\`.`,
 			1,
 		);
 	}
@@ -52,16 +53,16 @@ async function pickConnector(picked: string | undefined): Promise<{ id: string; 
 	}
 	// Interactive picker — list names and ask.
 	const names = list.map((c) => `${c.name} (${c.type}@${c.host}/${c.database})`).join("\n  ");
-	const answer = await promptLine(`Pick a connector:\n  ${names}\n> `);
+	const answer = await promptLine(`Pick a connection:\n  ${names}\n> `);
 	if (!answer) throw new CliError("Aborted.", 1);
-	const found = findConnectorByName(answer.trim());
-	if (!found?.id) throw new CliError(`No connector named '${answer}'.`, 1);
+	const found = findConnectionByName(answer.trim());
+	if (!found?.id) throw new CliError(`No connection named '${answer}'.`, 1);
 	return { id: found.id, name: found.name };
 }
 
-function getConnectorForExecution(name: string) {
-	const c = findConnectorByName(name);
-	if (!c) throw new CliError(`No local connector named '${name}'.`, 1);
+function getConnectionForExecution(name: string) {
+	const c = findConnectionByName(name);
+	if (!c) throw new CliError(`No local connection named '${name}'.`, 1);
 	return c;
 }
 
@@ -70,7 +71,7 @@ export function registerQuery(program: Command): void {
 		.command("query")
 		.description("Generate SQL and run it against the local DB")
 		.argument("<question...>", "Natural-language question")
-		.option("--connector <id|name>", "Connector to use (otherwise prompted)")
+		.option("--connection <id|name>", "Connection to use (otherwise prompted)")
 		.option("--generate-only", "Print the SQL without executing")
 		.option("--rows <n>", "Override LIMIT (1..100)", (v) => Number.parseInt(v, 10))
 		.option("--format <fmt>", "table | json | csv", "table")
@@ -83,7 +84,7 @@ export function registerQuery(program: Command): void {
 			}
 
 			const { client } = getSavedClient();
-			const connector = await pickConnector(opts.connector);
+			const connection = await pickConnection(opts.connection);
 
 			printInfo(t().info.generatingSql);
 			let createRes: {
@@ -95,26 +96,25 @@ export function registerQuery(program: Command): void {
 			};
 			try {
 				createRes = (await client.createQuery({
-					connector_id: connector.id,
+					connection_id: connection.id,
 					question,
 					rows_limit: opts.rows,
 				})) as typeof createRes;
 			} catch (err) {
-				if (isConnectorNotFoundError(err)) {
-					throw new CliError(t().errors.connectorNotFoundOnApi(connector.name), 1);
+				if (isConnectionNotFoundError(err)) {
+					throw new CliError(t().errors.connectionNotFoundOnApi(connection.name), 1);
 				}
 				throw err;
 			}
 
 			const sql = createRes.sql_generated ?? createRes.sql ?? "";
-			const queryId = createRes.id ?? "";
 
 			if (opts.generateOnly) {
 				console.log(sql);
 				appendHistory({
 					at: new Date().toISOString(),
 					question,
-					connector: connector.name,
+					connection: connection.name,
 					sql,
 					status: "generate-only",
 				});
@@ -123,7 +123,7 @@ export function registerQuery(program: Command): void {
 
 			// Persist to local history (handled in commit 6 via HistoryStore).
 			// Local execution
-			const local = getConnectorForExecution(connector.name);
+			const local = getConnectionForExecution(connection.name);
 			printInfo(t().info.executingSql);
 			const result = await executeSelect(
 				{
@@ -132,26 +132,19 @@ export function registerQuery(program: Command): void {
 					port: local.port,
 					user: local.user,
 					// Resolution chain: $EASYSQL_DB_PASSWORD > OS keyring > prompt.
-					// SQLite connectors have no credentials — skip the chain.
-					password: local.type === "sqlite" ? "" : await readPassword(local.name),
+					// SQLite connections have no credentials — skip the chain.
+					password: local.type === "sqlite" ? "" : await readPassword(local),
 					database: local.database,
 					ssl: local.ssl,
 				},
 				sql,
 			);
 
-			// Tell the API the local result so it can generate answer+chart.
-			if (queryId) {
-				try {
-					await client.answerQuery({ result_data: result.rows }, queryId);
-				} catch (err) {
-					if (!(err instanceof ApiError)) throw err;
-					printError(`Could not upload result to API: ${err.message}`);
-				}
-			}
+			// EZSQL-37: the API never receives result rows — rendering is fully
+			// client-side, so there is no answer upload step anymore.
 
-			// Update the local registry so the connector has an id mapping.
-			upsertConnector({ ...local, id: connector.id, updated_at: new Date().toISOString() });
+			// Update the local registry so the connection has an id mapping.
+			upsertConnection({ ...local, id: connection.id, updated_at: new Date().toISOString() });
 
 			console.log(
 				renderResult(
@@ -165,7 +158,7 @@ export function registerQuery(program: Command): void {
 			appendHistory({
 				at: new Date().toISOString(),
 				question,
-				connector: connector.name,
+				connection: connection.name,
 				sql,
 				row_count: result.row_count,
 				duration_ms: result.duration_ms,
@@ -174,8 +167,8 @@ export function registerQuery(program: Command): void {
 		});
 }
 
-async function readPassword(connectorName: string): Promise<string> {
-	const { password } = await resolveDbPassword(connectorName);
+async function readPassword(connection: StoredConnection): Promise<string> {
+	const { password } = await resolveDbPassword(connection);
 	if (password.length === 0) {
 		throw new CliError("Database password required to execute the query.", 1);
 	}

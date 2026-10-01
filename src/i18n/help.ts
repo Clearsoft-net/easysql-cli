@@ -29,10 +29,10 @@ Commands:
   login                 Authenticate with an EasySQL API key
   logout                Clear stored credentials
   demo                  Generate a local sample SQLite database (local-demo)
-  connector add         Add a local MySQL/Postgres/ClickHouse/SQLite connector
-  connector sync        Re-extract and push schema metadata
-  connector list        List connectors known to EasySQL
-  connector remove      Remove a local connector (and delete it from EasySQL)
+  connection add        Add a local MySQL/Postgres/ClickHouse/SQLite connection
+  connection sync       Re-extract and push schema metadata
+  connection list       List connections known to EasySQL
+  connection remove     Remove a local connection (and delete it from EasySQL)
   query "<question>"    Generate SQL and run it against the local DB
   usage                 Show plan consumption (quota used vs remaining)
   history               Show the local read-only question log
@@ -80,8 +80,8 @@ Usage: easysql logout
 Removes the stored API key from the local config file.
 `.trim();
 
-export const HELP_CONNECTOR_ADD = `
-Usage: easysql connector add [options]
+export const HELP_CONNECTION_ADD = `
+Usage: easysql connection add [options]
 
 Connect to a LOCAL MySQL, PostgreSQL, ClickHouse or SQLite database,
 extract its schema (tables, columns, types, primary keys, foreign keys,
@@ -89,7 +89,7 @@ row-count estimates), and push ONLY the schema metadata to EasySQL.
 Connection credentials are NEVER sent to the API — only the schema is.
 The password stays in memory for the introspection step; persisting it
 locally in the OS keyring (Keychain / libsecret / Windows Credential
-Manager) is opt-in via --save-password. SQLite connectors have no
+Manager) is opt-in via --save-password. SQLite connections have no
 credentials: the only required parameter is the absolute file path to a
 .db file.
 
@@ -99,7 +99,7 @@ prompts; in that mode every required flag must be supplied explicitly
 or the command exits with code 1.
 
 Required (always):
-  --name <name>         Human-readable connector name
+  --name <name>         Human-readable connection name
   --type <type>         'mysql' | 'mariadb' | 'postgresql' | 'clickhouse' | 'sqlite'
 
 Connection (one of --connection-url OR --host/--port/...):
@@ -124,63 +124,63 @@ Options:
   -y, --non-interactive  Disable prompts; fail when required values are missing
 
 Example:
-  easysql connector add \\
+  easysql connection add \\
     --name "Local Postgres" \\
     --type postgresql \\
     --host localhost --port 5432 --database mydb --user me
 
-  easysql connector add \\
+  easysql connection add \\
     --name "Local ClickHouse" \\
     --type clickhouse \\
     --connection-url "clickhouse://default:pass@localhost:8123/analytics"
 
-  easysql connector add --name "Local SQLite" --type sqlite --file /tmp/app.db
+  easysql connection add --name "Local SQLite" --type sqlite --file /tmp/app.db
 
   # Fully non-interactive (CI / scripts):
-  easysql connector add --non-interactive \\
+  easysql connection add --non-interactive \\
     --name "Local Postgres" --type postgresql \\
     --connection-url "postgresql://user:pass@host:5432/db"
 `.trim();
 
-export const HELP_CONNECTOR_SYNC = `
-Usage: easysql connector sync [name] [options]
+export const HELP_CONNECTION_SYNC = `
+Usage: easysql connection sync [name] [options]
 
-Re-introspect a locally-registered connector and push the updated schema
-metadata to EasySQL (POST /v1/connectors/{id}/sync). The local database is
+Re-introspect a locally-registered connection and push the updated schema
+metadata to EasySQL (POST /v1/connections/{id}/sync). The local database is
 contacted again, so a password is required for MySQL/Postgres/ClickHouse
-connectors (SQLite has none); it is resolved from $EASYSQL_DB_PASSWORD,
+connections (SQLite has none); it is resolved from $EASYSQL_DB_PASSWORD,
 then the OS keyring, then a prompt. The password never reaches the API —
 persist it locally with --save-password.
 
-With no argument and exactly one local connector, that connector is synced.
+With no argument and exactly one local connection, that connection is synced.
 
 Arguments:
-  [name]                Connector name (from \`easysql connector list\`)
+  [name]                Connection name (from \`easysql connection list\`)
 
 Options:
-  --id <connector-id>   Sync a specific connector by server id
+  --id <connection-id>   Sync a specific connection by server id
   --password <pass>     Database password (otherwise $EASYSQL_DB_PASSWORD,
                         the OS keyring, or prompted)
   --save-password       Persist the password in the OS keyring (opt-in)
   -y, --non-interactive  Fail instead of prompting when the password is missing
 
 Example:
-  easysql connector sync
-  easysql connector sync local-demo
-  easysql connector sync --id <connector-uuid>
+  easysql connection sync
+  easysql connection sync local-demo
+  easysql connection sync --id <connection-uuid>
 `.trim();
 
-export const HELP_CONNECTOR_LIST = `
-Usage: easysql connector list
+export const HELP_CONNECTION_LIST = `
+Usage: easysql connection list
 
-List all connectors known to your EasySQL account.
+List all connections known to your EasySQL account.
 `.trim();
 
-export const HELP_CONNECTOR_REMOVE = `
-Usage: easysql connector remove <name> [options]
+export const HELP_CONNECTION_REMOVE = `
+Usage: easysql connection remove <name> [options]
 
-Remove a locally-registered connector. Deletes it from the EasySQL API
-(the server-side schema cache) and from the local connectors.json. When
+Remove a locally-registered connection. Deletes it from the EasySQL API
+(the server-side schema cache) and from the local connections.json. When
 not logged in, only the local entry is removed.
 
 By default it asks for confirmation. Pass --yes (or -y) to skip the
@@ -190,14 +190,14 @@ Options:
   -y, --yes             Skip the confirmation prompt
 
 Example:
-  easysql connector remove local-demo
-  easysql connector remove local-demo --yes
+  easysql connection remove local-demo
+  easysql connection remove local-demo --yes
 `.trim();
 
 export const HELP_QUERY = `
 Usage: easysql query "<question>" [options]
 
-Send the natural-language question plus the selected connector's schema
+Send the natural-language question plus the selected connection's schema
 to the EasySQL API. The API returns SQL. The CLI then validates that the
 SQL is SELECT-only (defense-in-depth — the API already enforces this)
 and executes it against the LOCAL database.
@@ -207,7 +207,7 @@ Arguments:
                         contains spaces)
 
 Options:
-  --connector <id|name> Pick a specific connector (otherwise prompted)
+  --connection <id|name> Pick a specific connection (otherwise prompted)
   --generate-only       Print the generated SQL WITHOUT executing it
   --rows <n>            Override the LIMIT (1..100; default from server)
   --format <fmt>        Output format: table | json | csv (default: table)
@@ -265,8 +265,8 @@ export const HELP_DEMO = `
 Usage: easysql demo [options]
 
 Generate a small, fictional sample SQLite database and register it as a
-local connector named \`local-demo\`. Useful as a low-friction on-ramp:
-you can immediately run \`easysql query "..." --connector local-demo\`
+local connection named \`local-demo\`. Useful as a low-friction on-ramp:
+you can immediately run \`easysql query "..." --connection local-demo\`
 without setting up MySQL or PostgreSQL.
 
 The generated file lives at $XDG_DATA_HOME/easysql/demo.db (or
@@ -277,12 +277,12 @@ recreates the file, so the data is reset to the same state every time.
 
 Options:
   --file <path>         Override the output SQLite file path
-  --name <name>         Override the connector name (default: local-demo)
+  --name <name>         Override the connection name (default: local-demo)
   --no-register         Only write the .db file; skip the API +
-                        connectors-store registration steps
+                        connections-store registration steps
 
 Example:
   easysql demo
-  easysql query "Top 3 customers by revenue" --connector local-demo
+  easysql query "Top 3 customers by revenue" --connection local-demo
   easysql demo --file /tmp/custom.db --name staging
 `.trim();

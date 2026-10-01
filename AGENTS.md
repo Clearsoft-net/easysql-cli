@@ -4,7 +4,7 @@ Operational context for **easysql-cli** — the open-source CLI/TUI for the Easy
 
 ## What it is
 
-A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLite connectors (schema-only), runs natural-language queries through the EasySQL API, validates that the generated SQL is SELECT-only, executes it locally, and prints the results as a table. It ships an interactive TUI, self-update via GitHub Releases, and an `easysql demo` command that generates a sample SQLite database for instant experimentation.
+A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLite connections (schema-only), runs natural-language queries through the EasySQL API, validates that the generated SQL is SELECT-only, executes it locally, and prints the results as a table. It ships an interactive TUI, self-update via GitHub Releases, and an `easysql demo` command that generates a sample SQLite database for instant experimentation.
 
 **Core principle:** database credentials NEVER leave the host. Only schema metadata is sent to the API.
 
@@ -18,7 +18,7 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLi
 - **Output:** `chalk 5` (auto-detect TTY), custom table renderer
 - **Lint/format:** Biome 2.5 (`biome.json`, tabs, 100 col, LF, double quotes)
 - **TUI:** `ink` 7 + `react` 19 (`ink-testing-library` in dev) — running `easysql` with no subcommand opens React in the terminal
-- **Tests:** `bun test` (165 specs, no vitest dependency)
+- **Tests:** `bun test` (171 specs, no vitest dependency)
 - **Build:**
   - `bun run build` → `tsc -p scripts/tsconfig.json` → `dist/`
   - `bun run build:compile` → `bun build --compile --minify` → `bin/easysql` (standalone ~92 MB)
@@ -30,10 +30,10 @@ A TypeScript/Bun CLI that: logs in, manages local MySQL/Postgres/ClickHouse/SQLi
 | `easysql login` | Authenticates with an API key (`--api-key` / `$EASYSQL_API_KEY` / `--non-interactive`, -y) |
 | `easysql logout` | Clears local credentials |
 | `easysql demo` | Generates a local sample SQLite database and registers it as `local-demo` |
-| `easysql connector add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/clickhouse/sqlite); `--save-password` persists the password in the OS keyring |
-| `easysql connector sync [name]` | Re-introspects and re-sends the schema (`syncConnector`); with no name, uses the single local connector; `--save-password` persists the password in the OS keyring |
-| `easysql connector list` | Lists connectors known to the API |
-| `easysql connector remove <name>` | Removes the connector server-side (best-effort) and locally (`--yes` skips confirmation) |
+| `easysql connection add` | Introspects a local DB, sends only the schema to the API (mysql/mariadb/postgresql/clickhouse/sqlite); `--save-password` persists the password in the OS keyring |
+| `easysql connection sync [name]` | Re-introspects and re-sends the schema (`syncConnection`); with no name, uses the single local connection; `--save-password` persists the password in the OS keyring |
+| `easysql connection list` | Lists connections known to the API |
+| `easysql connection remove <name>` | Removes the connection server-side (best-effort) and locally (`--yes` skips confirmation) |
 | `easysql query "<q>"` | Generates SQL and executes it locally (SELECT-only) |
 | `easysql query "<q>" --generate-only` | Prints the SQL without executing |
 | `easysql usage` | Quota consumption (calls `/v1/dashboard/stats`) |
@@ -60,7 +60,7 @@ src/
 │   ├── login.ts                # registerLogin(program)
 │   ├── logout.ts
 │   ├── demo.ts                 # easysql demo — generates a sample local SQLite DB
-│   ├── connector.ts            # add|sync|remove|list group (mysql/mariadb/postgresql/clickhouse/sqlite)
+│   ├── connection.ts           # add|sync|remove|list group (mysql/mariadb/postgresql/clickhouse/sqlite)
 │   ├── query.ts                # registerQuery
 │   ├── usage.ts
 │   ├── history.ts
@@ -70,7 +70,7 @@ src/
 ├── config/
 │   ├── paths.ts                # XDG-aware: getConfigDir/getConfigPath/getDataDir/getHistoryPath
 │   ├── store.ts                # loadConfig/saveConfig/clearConfig/isLoggedIn (0600)
-│   ├── connectors-store.ts     # CRUD for local connectors (0600, no password)
+│   ├── connections-store.ts     # CRUD for local connections (0600, no password)
 │   └── keyring.ts              # OS keyring shell-out (security/secret-tool/PowerShell) — opt-in password store
 ├── db/
 │   ├── schema.ts               # re-exports schema types from @easysql/common + SUPPORTED_DB_TYPES/DEFAULT_PORTS
@@ -79,7 +79,7 @@ src/
 │   ├── demo.ts                 # buildDemoDatabase() — sample customers/products/orders
 │   ├── parse-url.ts            # re-exports parseConnectionUrl()/mergeConnection() from @easysql/common
 │   ├── password.ts             # resolveDbPassword/storedPassword — env > keyring > prompt
-│   ├── sync-connector.ts       # syncLocalConnector() — re-introspect + POST /sync
+│   ├── sync-connection.ts      # syncLocalConnection() — re-introspect + POST /sync
 │   └── execute.ts              # executeSelect() via @easysql/connector-*, validateSelectOnly() first
 ├── sdk/
 │   └── client.ts               # @easysql/client wrapper + resolveApiUrl()
@@ -101,8 +101,8 @@ src/
 │   ├── mount.tsx               # JSX wrapper that calls ink render(<App />, alternateScreen)
 │   ├── repl.ts                 # startRepl() — checks TTY and delegates to mount
 │   └── screens/
-│       ├── connectors.tsx      # list + add/remove/sync + j/k + Enter to activate
-│       ├── connector-sync.tsx  # <ConnectorSync> — introspect + POST /sync (inline password)
+│       ├── connections.tsx     # list + add/remove/sync + j/k + Enter to activate
+│       ├── connection-sync.tsx  # <ConnectionSync> — introspect + POST /sync (inline password)
 │       ├── usage.tsx           # <UsageView> — /usage (dashboard/stats)
 │       ├── history.tsx         # paginated list of HistoryEntry
 │       ├── question.tsx        # input + generate SQL + execute + table + /commands
@@ -118,7 +118,7 @@ scripts/
 ├── release-binaries.ts         # builds linux/darwin/windows x x64/arm64 → bin/easysql-*
 ├── tui-capture.ts              # dev: renders the TUI in a PTY (tmux) + --png screenshot
 └── tsconfig.json               # extends ../tsconfig.json, outDir=../dist
-tests/                          # bun:test — one file per module + _helpers.ts
+tests/                          # bun:test — one file per module + _helpers.ts + setup.ts (preload: silences console; EASYSQL_TEST_VERBOSE=1 to keep it)
 .github/workflows/
 ├── ci.yml                      # push/PR to main → lint+typecheck+test+build+smoke
 └── release.yml                 # tag v*.*.* → build binaries + SHA256SUMS + release
@@ -128,18 +128,18 @@ tests/                          # bun:test — one file per module + _helpers.ts
 
 - **Schema-only:** `introspectDatabase()` returns only `{tables, columns, types, pks, fks, rows_approx}`.
   Passwords, hosts, and ports NEVER cross the process boundary.
-- **Password never in `connectors.json`.** The store holds only `name/type/host/port/user/database/ssl` plus `owner` (the account email that registered it). Locally the password is resolved as `$EASYSQL_DB_PASSWORD` → OS keyring → prompt (`src/db/password.ts`); persistence in the keyring is opt-in via `connector add|sync --save-password`. The keyring (`src/config/keyring.ts`) shells out to `security`/`secret-tool`/PowerShell — no native addons, so it works under Node, Bun and the compiled binary; `EASYSQL_KEYRING=0` disables it.
+- **Password never in `connections.json`.** The store holds only `uid/name/type/host/port/user/database/ssl` plus `owner` (the account email that registered it); `uid` is a locally-minted UUID that keys the OS keyring entry (so a rename never orphans the secret). Locally the password is resolved as `$EASYSQL_DB_PASSWORD` → OS keyring → prompt (`src/db/password.ts`); persistence in the keyring is opt-in via `connection add|sync --save-password`. The keyring (`src/config/keyring.ts`) shells out to `security`/`secret-tool`/PowerShell — no native addons, so it works under Node, Bun and the compiled binary; `EASYSQL_KEYRING=0` disables it. Legacy entries stored under the old name-keyed account are migrated to the uid on first read.
 - **API key in `config.json` with `0600`.** chmod is best-effort on Windows.
 - **Local SQL validator** (`src/util/sql-validator.ts`): tokenizer + regex, applied before touching the local DB. The server side already enforces this; this is defense in depth.
 - **Stacked statements rejected**, only one trailing `;` allowed, the head must be `WITH|SELECT|EXPLAIN|SHOW`.
-- **SQLite connectors have no credentials.** The only thing leaving the machine is the schema; the `file` path stays in the local `connectors.json` (and is never sent to the API — only `{type: "sqlite", name, schema}`).
+- **SQLite connections have no credentials.** The only thing leaving the machine is the schema; the `file` path stays in the local `connections.json` (and is never sent to the API — only `{type: "sqlite", name, schema}`).
 
 ## Storage layout (XDG)
 
 | File | Contents | Permissions |
 |---|---|---|
 | `~/.config/easysql/config.json` | `{api_url, api_key, last_login_at, user_email?, user_name?, plan_name?}` | 0600 |
-| `~/.config/easysql/connectors.json` | array `StoredConnector[]` (no password; scoped per account via `owner`) | 0600 |
+| `~/.config/easysql/connections.json` | array `StoredConnection[]` (no password; scoped per account via `owner`) | 0600 |
 | `~/.local/share/easysql/history.jsonl` | one JSON entry per line, append-only | 0600 |
 | Windows: `%APPDATA%\easysql\` + `%LOCALAPPDATA%\easysql\` | same scheme, chmod is a no-op | — |
 
@@ -159,11 +159,11 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 - `src/sdk/client.ts` is the only bridge to `@easysql/client` (modular SDK v2).
 - `resolveApiUrl()`: `--api-url` > `$EASYSQL_API_URL` > saved config > `https://api.easysql.net`.
 - `getAuthenticatedClient(key, url)` returns an `AuthenticatedClient` (a hand-written interface mirroring the SDK).
-- `getSavedClient()`: throws `NotLoggedInError` if there is no config; used by `query`/`usage`/`connector`/`history`.
+- `getSavedClient()`: throws `NotLoggedInError` if there is no config; used by `query`/`usage`/`connection`/`history`.
 - `login` validates by calling `me()` before persisting; 401/403 → invalid-key error.
-- `createQuery` returns `{id, sql_generated, needs_local_execution, status}`; `query.ts` reads `sql_generated`, executes locally, then calls `answerQuery` (POST `/v1/queries/:id/answer`) with `result_data: result.rows` so the API can generate the answer+chart.
-- `syncConnector` requires a `{schema: TableSchema[]}` body; `connector.ts:282` still rejects `--id` with an explicit error — that is the place to change when implementing sync-by-name.
-- DB work goes through the SDK too: `introspectDatabase()` opens the matching `@easysql/connector-*` class and maps raw → payload with `generateSchema()`; `executeSelect()` validates SELECT-only first, then delegates to `connector.execute()`. Schema/URL contracts come from `@easysql/common`. Connectors load lazily via `src/db/load-connector.ts` (`import()` per engine) — only the driver for the active connector type is loaded. `connector-mysql`/`connector-postgres`/`connector-clickhouse` are `optionalDependencies` (install on demand with `bun add @easysql/connector-mysql`); a missing package surfaces as a `CliError` install hint, not a bare resolution error. `connector-sqlite` stays required (demo + default path).
+- `createQuery` returns `{id, sql_generated, needs_local_execution, status}`; `query.ts` reads `sql_generated` and executes it locally (EZSQL-37: the API no longer accepts result rows — `POST /v1/queries/:id/answer` was removed; rendering is fully client-side).
+- `syncConnection` requires a `{schema: TableSchema[]}` body; `connection.ts:282` still rejects `--id` with an explicit error — that is the place to change when implementing sync-by-name.
+- DB work goes through the SDK too: `introspectDatabase()` opens the matching `@easysql/connector-*` class and maps raw → payload with `generateSchema()`; `executeSelect()` validates SELECT-only first, then delegates to `connector.execute()`. Schema/URL contracts come from `@easysql/common`. Connections load lazily via `src/db/load-connector.ts` (`import()` per engine) — only the driver for the active connector type is loaded. `connector-mysql`/`connector-postgres`/`connector-clickhouse` are `optionalDependencies` (install on demand with `bun add @easysql/connector-mysql`); a missing package surfaces as a `CliError` install hint, not a bare resolution error. `connector-sqlite` stays required (demo + default path).
 
 ## Self-update
 
@@ -199,27 +199,27 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 
 - Command: `src/commands/demo.ts` + a pure generator in `src/db/demo.ts`.
 - Creates `$XDG_DATA_HOME/easysql/demo.db` (or `%LOCALAPPDATA%/easysql/demo.db`) with 4 deterministic tables (`customers`, `products`, `orders`, `order_items`). Re-running overwrites (idempotent).
-- Registers it as the `local-demo` connector (idempotent via `upsertConnector`). The `.db` path stays in the local `connectors.json`, never on the API.
-- `--no-register`: only writes the file, skips the API + `connectors-store` (useful for smoke tests).
+- Registers it as the `local-demo` connection (idempotent via `upsertConnection`). The `.db` path stays in the local `connections.json`, never on the API.
+- `--no-register`: only writes the file, skips the API + `connections-store` (useful for smoke tests).
 - The TUI empty-state (`src/tui/repl.ts:105`) suggests `easysql demo` as the on-ramp.
 
 ## TUI (ink-based)
 
 - `easysql` (no subcommand) opens an interactive React/ink shell (`src/tui/`).
-- 4 screens: **Connectors**, **History**, **Question**, **Help** modal.
-- Chrome (`src/tui/chrome.tsx`): **Header** with brand + active user email (via `me()`, cached in `config.json`) + connector + plan + version + API URL + online/offline status; **TabBar** as a segmented control (active tab in a cyan pill); **Footer** with contextual hints for the current screen and globals.
+- 4 screens: **Connections**, **History**, **Question**, **Help** modal.
+- Chrome (`src/tui/chrome.tsx`): **Header** with brand + active user email (via `me()`, cached in `config.json`) + connection + plan + version + API URL + online/offline status; **TabBar** as a segmented control (active tab in a cyan pill); **Footer** with contextual hints for the current screen and globals.
 - **Active user:** `App` (`src/tui/app.tsx`) calls `client.me()` on mount, updates the header, and persists `user_email`/`user_name`/`plan_name` to config for offline rendering; login already writes those fields.
 - Renders in the **alternate screen buffer** (vim/htop-style: fills the terminal and restores scrollback on exit). `mountTui` forces `interactive: true` in ink's `render()` — its auto-detection disables EVERYTHING if the `CI` env var is present in the user's shell (even on a real TTY), which made the TUI draw nothing and leave a black hole above the last frame. The `isatty()` gate in `repl.ts` already guarantees we only run on a TTY.
-- **Shortcut model:** `Tab` / `Shift-Tab` cycle Connectors → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
-- The **Question** screen uses a local `useInput` to build the text buffer and calls the same domain pipeline (`getSavedClient` → `createQuery` → `executeSelect` → `answerQuery` → `appendHistory`) — no duplicated logic.
-- **DB password in the TUI is always an inline field**, never `promptSecret`: for non-SQLite connectors the Question screen renders a `Password for <name>` input (masked, `Enter` executes, `Esc` cancels) after the API returns the SQL — but only when the resolution chain (`storedPassword()`: `$EASYSQL_DB_PASSWORD` → OS keyring) came up empty. A raw-mode `promptSecret` on stderr is erased by ink's alternate-screen redraws and looked like a hang. The sync runner (`<ConnectorSync>`) uses the same pattern.
+- **Shortcut model:** `Tab` / `Shift-Tab` cycle Connections → History → Question (the only global navigation key). The **Question** screen renders the **result (ink table `ResultTable`) before the SQL**, the SQL with **syntax highlighting** (`SqlText`), and uses a **spinner** (`Spinner`) instead of static text during "Generating/Executing". Actions starting with `/`: typing `/` in the Question input opens a **filterable dropdown** of commands (`/help`, `/connections`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`) — `↑/↓` select, `Enter` runs, `Esc` cancels. Ordinary characters (`1`, `2`, `3`, `q`, `?`) go straight to the buffer — `"which customer is 3 years old?"` is not interrupted.
+- The **Question** screen uses a local `useInput` to build the text buffer and calls the same domain pipeline (`getSavedClient` → `createQuery` → `executeSelect` → `appendHistory`) — no duplicated logic.
+- **DB password in the TUI is always an inline field**, never `promptSecret`: for non-SQLite connections the Question screen renders a `Password for <name>` input (masked, `Enter` executes, `Esc` cancels) after the API returns the SQL — but only when the resolution chain (`storedPassword()`: `$EASYSQL_DB_PASSWORD` → OS keyring) came up empty. A raw-mode `promptSecret` on stderr is erased by ink's alternate-screen redraws and looked like a hang. The sync runner (`<ConnectionSync>`) uses the same pattern.
 - Keybindings:
-  - Connectors: `j/k` or `↑/↓` navigate; `Enter` activates the highlighted connector or opens the add form when the last row ("+ Add a connector…") is selected; `s` syncs the highlighted connector; `d`/Del removes (confirm with `y`/Enter). In the form: `↑/↓` field, `←/→` type/SSL, `Enter` saves, `Esc` cancels.
-  - Sync (Connectors `s` and Question `/sync`): `<ConnectorSync>` (`src/tui/screens/connector-sync.tsx`) re-introspects and calls `syncLocalConnector`; resolves the password via `storedPassword()` (env > keyring) and asks inline only when both are empty, SQLite does not need one.
+  - Connections: `j/k` or `↑/↓` navigate; `Enter` activates the highlighted connection or opens the add form when the last row ("+ Add a connection…") is selected; `e` opens the edit form for the highlighted connection; `s` syncs the highlighted connection; `d`/Del removes (confirm with `y`/Enter). In the add/edit form: `↑/↓` field, `←/→` type/SSL/remember-password, `Enter` saves, `Esc` cancels. **Remember password** is ON by default and writes the secret to the OS keyring under the connection's local `uid` (never to `connections.json`); in edit mode `name`/`type` are locked (they are the API identity) and an empty Password keeps the stored one. Adding rejects a name already in use (it is the key in `connections.json`) with an inline warning and a blocked submit.
+  - Sync (Connections `s` and Question `/sync`): `<ConnectionSync>` (`src/tui/screens/connection-sync.tsx`) re-introspects and calls `syncLocalConnection`; resolves the password via `storedPassword()` (env > keyring) and asks inline only when both are empty, SQLite does not need one.
   - History: `h/l` or `←/→` paginate
   - Question: type the question, `Enter` submits, `Backspace` deletes; `/usage` shows plan/quota
   - Globals: `Tab` (next screen), `Shift-Tab` (previous), `Ctrl-C` (quit), `Esc` (close overlay)
-  - Slash-prompt: filterable dropdown — `/help` `/quit` `/connectors` `/history` `/question` `/clear` `/sync` `/usage` `/login` `/logout`
+  - Slash-prompt: filterable dropdown — `/help` `/quit` `/connections` `/history` `/question` `/clear` `/sync` `/usage` `/login` `/logout`
 - Tests in `tests/tui.test.tsx` use `ink-testing-library` (PassThrough stdin).
 - Without a TTY: `repl.ts` rejects with a message instructing `easysql query "..."`.
 
@@ -230,9 +230,9 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 | Add a subcommand | `src/commands/<name>.ts` + register in `src/cli/program.ts` + entry in `src/i18n/help.ts` + manual in `commands/help.ts` |
 | Change UI text | `src/i18n/messages.ts` (`t()`) |
 | Change help text | `src/i18n/help.ts` + map in `src/commands/help.ts` |
-| Add a DB driver | new `@easysql/connector-*` dep (optionalDep if not SQLite) + `SUPPORTED_DB_TYPES`/`DEFAULT_PORTS` in `src/db/schema.ts` + `StoredConnector` in `src/config/connectors-store.ts` + `load-*`/case in `src/db/load-connector.ts`, `src/db/introspect.ts`, `src/db/execute.ts` + `ALLOWED_TYPES` in `src/commands/connector.ts` + `TYPES` in `src/tui/screens/connectors.tsx` |
+| Add a DB driver | new `@easysql/connector-*` dep (optionalDep if not SQLite) + `SUPPORTED_DB_TYPES`/`DEFAULT_PORTS` in `src/db/schema.ts` + `StoredConnection` in `src/config/connections-store.ts` + `load-*`/case in `src/db/load-connector.ts`, `src/db/introspect.ts`, `src/db/execute.ts` + `ALLOWED_TYPES` in `src/commands/connection.ts` + `TYPES` in `src/tui/screens/connections.tsx` |
 | Add an API endpoint | `RawSdk` + `AuthenticatedClient` + `getAuthenticatedClient` in `src/sdk/client.ts` |
-| Change the persisted schema | `StoredConnector` in `src/config/connectors-store.ts` (migrate manually — no migration runner) |
+| Change the persisted schema | `StoredConnection` in `src/config/connections-store.ts` (migrate manually — no migration runner) |
 | Password/secret storage | `src/config/keyring.ts` (backend per OS) + resolution chain in `src/db/password.ts` |
 | Add a history entry | `HistoryEntry` in `src/history/store.ts` + write in `appendHistory` from the command |
 
@@ -241,7 +241,7 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 ```bash
 bun install --frozen-lockfile   # the lockfile is mandatory in CI
 bun run check                   # biome + tsc --noEmit (lint+typecheck)
-bun test                        # 165 specs (sqlite + demo + TUI included)
+bun test                        # 171 specs (sqlite + demo + TUI included)
 make build                      # tsc → dist/
 make build-compile              # bun --compile → bin/easysql
 make deb                        # .deb package for the host arch (ARCH=arm64 to cross-build)
@@ -253,7 +253,7 @@ make rpm                        # .rpm package for the host arch (ARCH=arm64 to 
 
 ## Current state
 
-- 165/165 tests passing (`bun test`).
+- 171/171 tests passing (`bun test`).
 - `bun run check` clean (minor `noExplicitAny` warnings in the SDK wrapper and 1 `useImportType` — non-blocking).
 - Standalone binary `bin/easysql` already built (~92 MB).
 - `bin/` and `dist/` are in `.gitignore` — do not commit.

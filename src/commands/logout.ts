@@ -14,6 +14,6 @@ export function registerLogout(program: Command): void {
 		.action(() => {
 			const removed = clearConfig();
 			if (removed) printSuccess(t().success.loggedOut);
-			else printSuccess(t().success.loggedOut + " (nothing to clear)");
+			else printSuccess(`${t().success.loggedOut} (nothing to clear)`);
 		});
 }

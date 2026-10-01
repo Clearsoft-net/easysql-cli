@@ -14,15 +14,16 @@ export const MESSAGES = {
 			configNotFound: "Config file not found. Run 'easysql login' first.",
 			configReadError: (msg: string) => `Could not read config: ${msg}`,
 			configWriteError: (msg: string) => `Could not write config: ${msg}`,
-			noConnector: "No connector selected. Use --connector or run 'easysql connector list'.",
-			connectorNotFound: (name: string) => `Connector '${name}' not found.`,
-			connectorNotFoundOnApi: (name: string) =>
-				`Connector '${name}' no longer exists on the EasySQL API for the current account. ` +
-				`Re-register it with \`easysql connector add\` (or \`easysql demo\` for the sample database), then retry.`,
+			noConnection:
+				"No connection selected. Use --connection or run 'easysql connection list'.",
+			connectionNotFound: (name: string) => `Connection '${name}' not found.`,
+			connectionNotFoundOnApi: (name: string) =>
+				`Connection '${name}' no longer exists on the EasySQL API for the current account. ` +
+				`Re-register it with \`easysql connection add\` (or \`easysql demo\` for the sample database), then retry.`,
 			removeNonInteractive:
 				"Refusing to remove without confirmation in a non-interactive shell. Pass --yes.",
-			multipleConnectors: (n: number) =>
-				`${n} connectors available. Use --connector <id> to pick one.`,
+			multipleConnections: (n: number) =>
+				`${n} connections available. Use --connection <id> to pick one.`,
 			queryRejected: (sql: string, reason: string) =>
 				`Generated SQL was rejected by the local safety check (${reason}). SQL:\n${sql}`,
 			updateNoBinary: "Could not determine the path of the running binary.",
@@ -36,9 +37,9 @@ export const MESSAGES = {
 		prompts: {
 			passwordPrompt: "Password",
 			apiKeyPrompt: "EasySQL API key",
-			connectorPickPrompt: "Pick a connector",
-			connectorNamePrompt: "Connector name",
-			connectorTypePrompt:
+			connectionPickPrompt: "Pick a connection",
+			connectionNamePrompt: "Connection name",
+			connectionTypePrompt:
 				"Database type (mysql | mariadb | postgresql | clickhouse | sqlite)",
 			useConnectionUrlPrompt: "Use a full connection URL? (y/N)",
 			connectionUrlPrompt: "Connection URL",
@@ -46,14 +47,15 @@ export const MESSAGES = {
 			dbPortPrompt: "Database port",
 			dbUserPrompt: "Database user",
 			dbNamePrompt: "Database name",
-			confirmRemove: (name: string) => `Remove connector '${name}'? (y/N)`,
+			confirmRemove: (name: string) => `Remove connection '${name}'? (y/N)`,
 		},
 		success: {
 			loggedIn: "Logged in successfully.",
 			loggedOut: "Logged out.",
-			connectorAdded: (name: string, id: string) => `Connector '${name}' added (id: ${id}).`,
-			connectorRemoved: (name: string) => `Connector '${name}' removed.`,
-			connectorSynced: (name: string, tables: number) =>
+			connectionAdded: (name: string, id: string) =>
+				`Connection '${name}' added (id: ${id}).`,
+			connectionRemoved: (name: string) => `Connection '${name}' removed.`,
+			connectionSynced: (name: string, tables: number) =>
 				`Synced '${name}' (${tables} table${tables === 1 ? "" : "s"}).`,
 			passwordSavedKeyring: (name: string) =>
 				`Password for '${name}' saved in the OS keyring.`,
@@ -68,7 +70,7 @@ export const MESSAGES = {
 			executingSql: "Executing SQL locally…",
 			introspectingDb: "Introspecting local database schema…",
 			removeAborted: "Aborted. Nothing was removed.",
-			connectorRemovedLocalOnly:
+			connectionRemovedLocalOnly:
 				"Not logged in — removed locally only (the server copy was not touched).",
 		},
 	},

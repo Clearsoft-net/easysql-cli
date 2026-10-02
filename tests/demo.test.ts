@@ -56,7 +56,7 @@ describe("buildDemoDatabase", () => {
 		expect(result.rows[0]?.c).toBe(5);
 	});
 
-	it("exports the canonical connector name", () => {
+	it("exports the canonical connection name", () => {
 		expect(DEMO_CONNECTOR_NAME).toBe("local-demo");
 	});
 });

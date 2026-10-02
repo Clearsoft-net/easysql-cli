@@ -49,7 +49,7 @@ export function HistoryScreen() {
 				return (
 					<Text key={`${e.at}-${i}`}>
 						<Text dimColor>{truncate(e.at, 19)}</Text>{" "}
-						<Text color="cyan">[{e.connector}]</Text>{" "}
+						<Text color="cyan">[{e.connection}]</Text>{" "}
 						<Text color={e.status === "ok" ? "green" : "yellow"}>{status}</Text>{" "}
 						{truncate(e.question, 60)}
 					</Text>

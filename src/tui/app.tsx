@@ -3,14 +3,14 @@
  * + footer) around the active screen slot, plus a help modal overlay.
  *
  * Keybindings:
- *   Tab / Shift-Tab — cycle between Connectors / History / Question.
+ *   Tab / Shift-Tab — cycle between Connections / History / Question.
  *   Ctrl-C          — quit immediately.
  *   Esc             — close the help modal.
  *
  * Inside any screen, `/` opens a transient slash-prompt at the bottom
  * where the user can type slash-commands. The Question screen has its
  * own normal typing input; the slash-prompt is the only place where
- * `/help`, `/quit`, `/connectors`, etc. are consumed.
+ * `/help`, `/quit`, `/connections`, etc. are consumed.
  *
  * The design avoids the classic TUI problem where global shortcuts eat
  * characters a user is trying to type — Tab is the only navigation key
@@ -24,21 +24,21 @@
 import { Box, Text, useApp, useInput, useWindowSize } from "ink";
 import { useEffect, useState } from "react";
 import {
-	findConnectorByName,
-	loadConnectors,
-	type StoredConnector,
-} from "../config/connectors-store.js";
+	findConnectionByName,
+	loadConnections,
+	type StoredConnection,
+} from "../config/connections-store.js";
 import { clearConfig, loadConfig, saveConfig } from "../config/store.js";
 import { getSavedClient } from "../sdk/client.js";
 import { Footer, Header, TabBar } from "./chrome.js";
-import { ConnectorsScreen } from "./screens/connectors.js";
+import { ConnectionsScreen } from "./screens/connections.js";
 import { HelpScreen } from "./screens/help.js";
 import { HistoryScreen } from "./screens/history.js";
 import { QuestionScreen } from "./screens/question.js";
 
-export type ScreenName = "connectors" | "history" | "question";
+export type ScreenName = "connections" | "history" | "question";
 
-const SCREENS: ScreenName[] = ["connectors", "history", "question"];
+const SCREENS: ScreenName[] = ["connections", "history", "question"];
 
 export function nextScreen(current: ScreenName, reverse = false): ScreenName {
 	const idx = SCREENS.indexOf(current);
@@ -48,10 +48,10 @@ export function nextScreen(current: ScreenName, reverse = false): ScreenName {
 }
 
 interface AppProps {
-	initialConnector?: string;
+	initialConnection?: string;
 }
 
-export function App({ initialConnector }: AppProps) {
+export function App({ initialConnection }: AppProps) {
 	const { exit } = useApp();
 	// Pin the frame to the real terminal height. Ink's height="100%" on the
 	// root resolves to the content's natural height (the root's own height is
@@ -68,10 +68,10 @@ export function App({ initialConnector }: AppProps) {
 	// so a stray keypress doesn't yank focus away from in-flight work.
 	const [questionBusy, setQuestionBusy] = useState(false);
 	const [active, setActive] = useState<string | undefined>(() => {
-		if (initialConnector) {
-			return findConnectorByName(initialConnector)?.name ?? initialConnector;
+		if (initialConnection) {
+			return findConnectionByName(initialConnection)?.name ?? initialConnection;
 		}
-		const list = loadConnectors();
+		const list = loadConnections();
 		return list.length === 1 ? list[0]?.name : undefined;
 	});
 	const cfg = loadConfig();
@@ -122,7 +122,7 @@ export function App({ initialConnector }: AppProps) {
 
 		// Tab / Shift-Tab cycle the active screen. We allow Tab even
 		// while the Question screen has input focus so the user can
-		// hop to Connectors without losing the buffer — but only when
+		// hop to Connections without losing the buffer — but only when
 		// the Question screen isn't mid-query.
 		const inputBusy = screen === "question" && questionBusy;
 		if (!inputBusy && key.tab) {
@@ -143,8 +143,8 @@ export function App({ initialConnector }: AppProps) {
 		void input;
 	});
 
-	const activeConnector: StoredConnector | undefined = active
-		? findConnectorByName(active)
+	const activeConnection: StoredConnection | undefined = active
+		? findConnectionByName(active)
 		: undefined;
 	const apiUrl = cfg.api_url || undefined;
 
@@ -165,7 +165,7 @@ export function App({ initialConnector }: AppProps) {
 		<Box flexDirection="column" height={rows}>
 			<Header
 				active={active}
-				connectorType={activeConnector?.type}
+				connectionType={activeConnection?.type}
 				apiUrl={apiUrl}
 				online={cfg.api_key.length > 0}
 				userEmail={user.email}
@@ -173,13 +173,13 @@ export function App({ initialConnector }: AppProps) {
 			/>
 			<TabBar active={screen} />
 			<Box flexDirection="column" flexGrow={1} overflow="hidden" paddingX={1}>
-				{screen === "connectors" && (
-					<ConnectorsScreen active={active} onSelect={setActive} />
+				{screen === "connections" && (
+					<ConnectionsScreen active={active} onSelect={setActive} />
 				)}
 				{screen === "history" && <HistoryScreen />}
 				{screen === "question" && active && (
 					<QuestionScreen
-						connector={active}
+						connection={active}
 						onBusyChange={setQuestionBusy}
 						onSwitchScreen={setScreen}
 						onOpenHelp={() => setHelpOpen(true)}
@@ -191,11 +191,11 @@ export function App({ initialConnector }: AppProps) {
 				{screen === "question" && !active && (
 					<Box flexDirection="column">
 						<Text bold color="yellow">
-							No connector selected
+							No connection selected
 						</Text>
 						<Text> </Text>
 						<Text>
-							Press <Text color="cyan">[Tab]</Text> to switch to Connectors
+							Press <Text color="cyan">[Tab]</Text> to switch to Connections
 							and pick one with <Text color="cyan">Enter</Text>.
 						</Text>
 						<Text> </Text>

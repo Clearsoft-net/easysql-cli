@@ -11,11 +11,11 @@ import { isJsonMode, print } from "../output/print.js";
 import { getSavedClient } from "../sdk/client.js";
 
 interface DashboardStats {
-	active_connectors?: number;
+	active_connections?: number;
 	queries_used_this_month?: number;
 	queries_limit?: number;
 	queries_per_day?: { date?: string; count?: number }[];
-	most_used_connectors?: { connector_name?: string; query_count?: number }[];
+	most_used_connections?: { connection_name?: string; query_count?: number }[];
 	fetched_at?: string;
 }
 
@@ -38,13 +38,13 @@ export function registerUsage(program: Command): void {
 				const limit = typeof s.queries_limit === "number" ? ` / ${s.queries_limit}` : "";
 				console.log(`Queries this month: ${s.queries_used_this_month}${limit}`);
 			}
-			if (typeof s.active_connectors === "number") {
-				console.log(`Active connectors:  ${s.active_connectors}`);
+			if (typeof s.active_connections === "number") {
+				console.log(`Active connections:  ${s.active_connections}`);
 			}
-			if (s.most_used_connectors && s.most_used_connectors.length > 0) {
-				console.log("Most used connectors:");
-				for (const c of s.most_used_connectors) {
-					console.log(`  ${c.connector_name ?? "?"}  ${c.query_count ?? 0}`);
+			if (s.most_used_connections && s.most_used_connections.length > 0) {
+				console.log("Most used connections:");
+				for (const c of s.most_used_connections) {
+					console.log(`  ${c.connection_name ?? "?"}  ${c.query_count ?? 0}`);
 				}
 			}
 		});

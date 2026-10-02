@@ -10,7 +10,7 @@ import { printError } from "../output/print.js";
 import { mountTui } from "./mount.js";
 
 interface ReplOptions {
-	connector?: string;
+	connection?: string;
 }
 
 export async function startRepl(opts: ReplOptions): Promise<number> {

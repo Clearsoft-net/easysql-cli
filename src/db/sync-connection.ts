@@ -1,10 +1,10 @@
 /**
- * Re-introspect a locally-registered connector and push the fresh schema
- * to EasySQL (`POST /v1/connectors/{id}/sync`). Credentials are used in
+ * Re-introspect a locally-registered connection and push the fresh schema
+ * to EasySQL (`POST /v1/connections/{id}/sync`). Credentials are used in
  * memory only; the password is never persisted.
  */
 
-import { type StoredConnector, upsertConnector } from "../config/connectors-store.js";
+import { type StoredConnection, upsertConnection } from "../config/connections-store.js";
 import { getSavedClient } from "../sdk/client.js";
 import { introspectDatabase, type ParsedConnection } from "./introspect.js";
 
@@ -13,13 +13,13 @@ export interface SyncResult {
 	last_sync_at?: string;
 }
 
-export async function syncLocalConnector(
-	stored: StoredConnector,
+export async function syncLocalConnection(
+	stored: StoredConnection,
 	password: string,
 ): Promise<SyncResult> {
 	if (!stored.id) {
 		throw new Error(
-			`Connector '${stored.name}' has no server id — re-add it with \`easysql connector add\`.`,
+			`Connection '${stored.name}' has no server id — re-add it with \`easysql connection add\`.`,
 		);
 	}
 	const conn: ParsedConnection = {
@@ -33,10 +33,10 @@ export async function syncLocalConnector(
 	};
 	const schema = await introspectDatabase(conn);
 	const { client } = getSavedClient();
-	const result = (await client.syncConnector({ schema }, stored.id)) as {
+	const result = (await client.syncConnection({ schema }, stored.id)) as {
 		tables?: Record<string, never>[];
 		last_sync_at?: string;
 	};
-	upsertConnector({ ...stored, updated_at: new Date().toISOString() });
+	upsertConnection({ ...stored, updated_at: new Date().toISOString() });
 	return { tables: result?.tables?.length, last_sync_at: result?.last_sync_at };
 }

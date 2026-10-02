@@ -15,9 +15,9 @@ agente inspecioná-la, rode-a dentro de um PTY (tmux) e leia o frame com
 - `tmux` instalado (`command -v tmux`).
 - Dependências instaladas (`bun install`).
 - Pelo menos um conector local, senão a tela Question mostra
-  "No connector selected". Gere um com `bun run src/bin.ts demo` (registra
-  `local-demo`), ou semeie `connectors.json` manualmente.
-- A TUI lê `~/.config/easysql/config.json` e `connectors.json` reais —
+  "No connection selected". Gere um com `bun run src/bin.ts demo` (registra
+  `local-demo`), ou semeie `connections.json` manualmente.
+- A TUI lê `~/.config/easysql/config.json` e `connections.json` reais —
   sem `--config`/`--api-url` aqui, então o frame reflete o estado da máquina.
 
 > **Entrypoint correto:** `bun run src/bin.ts`. O script `dev` do
@@ -60,8 +60,14 @@ Os `tokens` são enviados na ordem: começando com `$` = tecla tmux
 # Question (default) — caixa de input + exemplos
 bun run scripts/tui-capture.ts --size 100x26
 
-# Connectors — Tab uma vez
+# Connections — Tab uma vez
 bun run scripts/tui-capture.ts --size 100x26 '$Tab'
+
+# Connections → form de add ("Remember password" ON por padrão)
+bun run scripts/tui-capture.ts --size 100x32 '$Tab' 'j' 'j' '$Enter'
+
+# Connections → form de edição do 2º conector da lista
+bun run scripts/tui-capture.ts --size 100x32 '$Tab' 'j' 'e'
 
 # History — Tab duas vezes
 bun run scripts/tui-capture.ts --size 100x26 '$Tab' '$Tab'
@@ -100,22 +106,26 @@ Sempre encerre a sessão ao terminar; `--keep` só existe para inspeção manual
 
 - **Globais:** `Tab` próxima tela · `Shift-Tab` (`$BTab`) anterior · `Ctrl-C`
   (`$C-c`) quit · `Esc` fecha overlay/slash.
-- **Connectors:** `j`/`k` ou setas navegam · `Enter` ativa o conector em
-  destaque (ou abre o form de add quando a última linha "+ Add a connector…"
-  está selecionada) · `s` sincroniza o conector em destaque · `d`/Del remove
-  (confirmação `y`/Enter, `n`/Esc). No form de add: `↑`/`↓` campo, `←`/`→`
-  ciclo de tipo / toggle SSL, `Enter` salva, `Esc` cancela.
-- **Sync:** `s` (Connectors) e `/sync` (Question) re-introspectam o conector
+- **Connections:** `j`/`k` ou setas navegam · `Enter` ativa o conector em
+  destaque (ou abre o form de add quando a última linha "+ Add a connection…"
+  está selecionada) · `e` abre o form de **edição** do conector em destaque ·
+  `s` sincroniza o conector em destaque · `d`/Del remove (confirmação
+  `y`/Enter, `n`/Esc). No form de add/edit: `↑`/`↓` campo, `←`/`→` ciclo de
+  tipo / toggle SSL / toggle **Remember password** (padrão ON — grava a senha
+  no keyring do SO sob o `uid` local do conector), `Enter` salva, `Esc` cancela. No
+  edit, `name`/`type` ficam travados (identidade na API) e Password vazio
+  mantém o valor armazenado.
+- **Sync:** `s` (Connections) e `/sync` (Question) re-introspectam o conector
   ativo e reenviam o schema; MySQL/Postgres pedem a senha inline (ou usam
   `$EASYSQL_DB_PASSWORD`), SQLite não.
 - **History:** `h`/`l` ou setas paginam.
 - **Question:** qualquer texto entra no buffer · `Enter` submete · `Backspace`
   apaga · `?` e números são literais (não atalhos).
 - **Slash (dentro da Question):** digitar `/` abre um **dropdown filtrável** de
-  comandos (`/help`, `/connectors`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`).
+  comandos (`/help`, `/connections`, `/history`, `/question`, `/clear`, `/sync`, `/usage`, `/login`, `/logout`, `/quit`).
   Digitar filtra; `↑`/`↓` (`$Up`/`$Down`) navegam a seleção; `Enter` executa;
   `Esc` cancela; `Backspace` edita. Aliases continuam aceitos ao digitar
-  (`/c`,`/1` connectors; `/h2`,`/2` history; `/q2`,`/3` question; `/cls` clear).
+  (`/c`,`/1` connections; `/h2`,`/2` history; `/q2`,`/3` question; `/cls` clear).
 
 ## Gotchas
 

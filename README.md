@@ -27,7 +27,7 @@ Ask questions in natural language to your local **MySQL**, **PostgreSQL**, **Cli
 The **EasySQL CLI** is the open-source counterpart to the WordPress plugin. It runs the full EasySQL query flow client-side:
 
 1. You connect a local MySQL, PostgreSQL, ClickHouse or SQLite database. (Or run `easysql demo` to spin up a sample SQLite database in seconds.)
-2. The CLI introspects the schema and pushes **only the schema metadata** to the EasySQL API — credentials never leave your machine. SQLite connectors have no credentials at all.
+2. The CLI introspects the schema and pushes **only the schema metadata** to the EasySQL API — credentials never leave your machine. SQLite connections have no credentials at all.
 3. You ask questions in natural language; the API returns SQL.
 4. The CLI validates that the SQL is **SELECT-only** and executes it against your local database.
 5. Results are printed as a table — or opened in an interactive TUI shell.
@@ -75,20 +75,20 @@ easysql login
 easysql demo
 easysql query "Top 3 customers by revenue"
 
-# 2b. Or add a real local database connector (schema is sent to EasySQL, not credentials)
-easysql connector add \
+# 2b. Or add a real local database connection (schema is sent to EasySQL, not credentials)
+easysql connection add \
   --name "Local Postgres" \
   --type postgresql \
   --host localhost --port 5432 --database mydb --user me --password mypass
 
 # 2c. Or point at a local SQLite file
-easysql connector add \
+easysql connection add \
   --name "Local SQLite" \
   --type sqlite \
   --file /path/to/your.db
 
 # 2d. Or a local ClickHouse server (HTTP interface)
-easysql connector add \
+easysql connection add \
   --name "Local ClickHouse" \
   --type clickhouse \
   --connection-url "clickhouse://default:pass@localhost:8123/analytics"
@@ -110,10 +110,10 @@ easysql
 | `easysql login` | Authenticate with an EasySQL API key |
 | `easysql logout` | Clear local credentials |
 | `easysql demo` | Generate a local sample SQLite database and register it as `local-demo` |
-| `easysql connector add` | Add a local MySQL / Postgres / ClickHouse / SQLite connector |
-| `easysql connector sync [name]` | Re-introspect and push the schema again |
-| `easysql connector list` | List connectors from EasySQL |
-| `easysql connector remove <name>` | Remove a connector from EasySQL and locally |
+| `easysql connection add` | Add a local MySQL / Postgres / ClickHouse / SQLite connection |
+| `easysql connection sync [name]` | Re-introspect and push the schema again |
+| `easysql connection list` | List connections from EasySQL |
+| `easysql connection remove <name>` | Remove a connection from EasySQL and locally |
 | `easysql query "<question>"` | Generate SQL and run it locally |
 | `easysql query "<question>" --generate-only` | Print the SQL without executing |
 | `easysql usage` | Show plan consumption (quota used vs remaining) |
@@ -128,7 +128,7 @@ Global flags: `--api-url`, `--config`, `--json`, `--no-color`, `-v`, `-h`.
 - **Credentials never leave your machine.** The CLI only introspects your local database to extract schema metadata (`tables`, `columns`, `types`, `primary_keys`, `foreign_keys`, `row_count_estimate`) and sends that — never passwords, hosts, or ports.
 - **Read-only enforcement.** Generated SQL is validated server-side by the EasySQL API. The CLI additionally refuses to execute any non-SELECT statement.
 - **API key storage.** Stored in `~/.config/easysql/config.json` with `0600` permissions.
-- Database passwords stay on your machine: they resolve from `$EASYSQL_DB_PASSWORD`, then your OS keyring (opt-in with `connector add --save-password`), then a prompt — never to the API.
+- Database passwords stay on your machine: they resolve from `$EASYSQL_DB_PASSWORD`, then your OS keyring (opt-in with `connection add --save-password`), then a prompt — never to the API.
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 

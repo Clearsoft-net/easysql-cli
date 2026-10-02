@@ -1,6 +1,6 @@
 /**
  * Usage panel for the chat (`/usage`): plan + monthly query quota +
- * active connectors + most-used connectors, fetched from
+ * active connections + most-used connections, fetched from
  * GET /v1/dashboard/stats.
  */
 
@@ -10,10 +10,10 @@ import { loadConfig } from "../../config/store.js";
 import { getSavedClient } from "../../sdk/client.js";
 
 interface DashboardStats {
-	active_connectors?: number;
+	active_connections?: number;
 	queries_used_this_month?: number;
 	queries_limit?: number;
-	most_used_connectors?: { connector_name?: string; query_count?: number }[];
+	most_used_connections?: { connection_name?: string; query_count?: number }[];
 }
 
 export function UsageView({ onExit }: { onExit: () => void }) {
@@ -63,14 +63,14 @@ export function UsageView({ onExit }: { onExit: () => void }) {
 						Queries this month: {typeof used === "number" ? used : "?"}
 						{typeof limit === "number" ? ` / ${limit}` : ""}
 					</Text>
-					<Text>Active connectors:  {stats.active_connectors ?? "?"}</Text>
-					{stats.most_used_connectors && stats.most_used_connectors.length > 0 && (
+					<Text>Active connections:  {stats.active_connections ?? "?"}</Text>
+					{stats.most_used_connections && stats.most_used_connections.length > 0 && (
 						<Box flexDirection="column" marginTop={1}>
-							<Text dimColor>Most used connectors</Text>
-							{stats.most_used_connectors.slice(0, 5).map((c, i) => (
-								<Text key={`${c.connector_name ?? "?"}-${i}`}>
+							<Text dimColor>Most used connections</Text>
+							{stats.most_used_connections.slice(0, 5).map((c, i) => (
+								<Text key={`${c.connection_name ?? "?"}-${i}`}>
 									{"  "}
-									<Text color="cyan">{c.connector_name ?? "?"}</Text> {c.query_count ?? 0}
+									<Text color="cyan">{c.connection_name ?? "?"}</Text> {c.query_count ?? 0}
 								</Text>
 							))}
 						</Box>

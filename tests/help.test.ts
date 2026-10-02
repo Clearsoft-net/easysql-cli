@@ -16,8 +16,8 @@ describe("renderHelp", () => {
 	});
 
 	it("renders per-command help for compound commands", () => {
-		const out = renderHelp("connector add");
-		expect(out).toMatch(/Usage: easysql connector add/);
+		const out = renderHelp("connection add");
+		expect(out).toMatch(/Usage: easysql connection add/);
 		expect(out).toMatch(/--type/);
 	});
 
@@ -31,10 +31,10 @@ describe("renderHelp", () => {
 		const commands = [
 			"login",
 			"logout",
-			"connector add",
-			"connector sync",
-			"connector list",
-			"connector remove",
+			"connection add",
+			"connection sync",
+			"connection list",
+			"connection remove",
 			"query",
 			"usage",
 			"history",

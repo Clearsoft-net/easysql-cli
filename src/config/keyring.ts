@@ -3,7 +3,7 @@
  *
  * The "credentials never leave the host" rule is about the API: only the
  * schema is sent to EasySQL. On the client machine the password MAY be
- * persisted — opt-in via `connector add/sync --save-password` — and this
+ * persisted — opt-in via `connection add/sync --save-password` — and this
  * module stores it in the native credential store of the OS:
  *
  *   darwin  /usr/bin/security   (macOS Keychain)

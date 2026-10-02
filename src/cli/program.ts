@@ -3,7 +3,7 @@
  */
 
 import { Command } from "commander";
-import { registerConnector } from "../commands/connector.js";
+import { registerConnection } from "../commands/connection.js";
 import { registerDemo } from "../commands/demo.js";
 import { registerHelp } from "../commands/help.js";
 import { registerHistory } from "../commands/history.js";
@@ -37,8 +37,8 @@ export function buildProgram(): Command {
 		.exitOverride()
 		.action(async (_opts, command) => {
 			// Bare 'easysql' (no subcommand) opens the interactive TUI shell.
-			const parentOpts = (command.parent?.opts() ?? {}) as { connector?: string };
-			const code = await startRepl({ connector: parentOpts.connector });
+			const parentOpts = (command.parent?.opts() ?? {}) as { connection?: string };
+			const code = await startRepl({ connection: parentOpts.connection });
 			if (code !== 0) process.exit(code);
 		});
 
@@ -55,7 +55,7 @@ export function buildProgram(): Command {
 	registerLogin(program);
 	registerLogout(program);
 	registerDemo(program);
-	registerConnector(program);
+	registerConnection(program);
 	registerQuery(program);
 	registerUsage(program);
 	registerHistory(program);

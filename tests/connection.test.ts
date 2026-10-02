@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../src/cli.js";
-import { loadConnectors, type StoredConnector } from "../src/config/connectors-store.js";
+import { loadConnections, type StoredConnection } from "../src/config/connections-store.js";
 import { setConfigPathOverride } from "../src/config/paths.js";
 
 type FetchHandler = (url: string, init?: RequestInit) => Promise<Response>;
@@ -23,7 +23,7 @@ function urlOf(input: string | URL | Request): string {
 	return String(input);
 }
 
-describe("connector commands", () => {
+describe("connection commands", () => {
 	let tmp: string;
 	let originalFetch: typeof fetch;
 	let originalKeyring: string | undefined;
@@ -35,7 +35,7 @@ describe("connector commands", () => {
 	};
 
 	beforeEach(() => {
-		tmp = mkdtempSync(join(tmpdir(), "easysql-connector-"));
+		tmp = mkdtempSync(join(tmpdir(), "easysql-connection-"));
 		setConfigPathOverride(join(tmp, "config.json"));
 		writeFileSync(join(tmp, "config.json"), JSON.stringify(loggedInConfig));
 		originalKeyring = process.env.EASYSQL_KEYRING;
@@ -59,9 +59,9 @@ describe("connector commands", () => {
 		rmSync(tmp, { recursive: true, force: true });
 	});
 
-	it("connector list renders a table when connectors exist", async () => {
+	it("connection list renders a table when connections exist", async () => {
 		handler = (url) => {
-			if (url.endsWith("/v1/connectors")) {
+			if (url.endsWith("/v1/connections")) {
 				return Promise.resolve(
 					jsonResponse([
 						{ id: "c1", name: "Prod", type: "postgresql", updated_at: "2026-09-01" },
@@ -71,21 +71,22 @@ describe("connector commands", () => {
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
-		const code = await run(["--json", "connector", "list"]);
+		const code = await run(["--json", "connection", "list"]);
 		expect(code).toBe(0);
 	});
 
-	it("connector list prints a friendly message on empty", async () => {
+	it("connection list prints a friendly message on empty", async () => {
 		handler = (url) => {
-			if (url.endsWith("/v1/connectors")) return Promise.resolve(jsonResponse([]));
+			if (url.endsWith("/v1/connections")) return Promise.resolve(jsonResponse([]));
 			throw new Error(`unexpected: ${url}`);
 		};
-		const code = await run(["connector", "list"]);
+		const code = await run(["connection", "list"]);
 		expect(code).toBe(0);
 	});
 
-	const storedConnector: StoredConnector = {
+	const storedConnection: StoredConnection = {
 		id: "c1",
+		uid: "uid-c1",
 		name: "Prod",
 		type: "postgresql",
 		host: "db.example.com",
@@ -96,48 +97,48 @@ describe("connector commands", () => {
 		updated_at: "2026-09-01T00:00:00Z",
 	};
 
-	it("connector remove deletes the connector on the server and locally", async () => {
-		writeFileSync(join(tmp, "connectors.json"), JSON.stringify([storedConnector]));
+	it("connection remove deletes the connection on the server and locally", async () => {
+		writeFileSync(join(tmp, "connections.json"), JSON.stringify([storedConnection]));
 		let deleted = false;
 		handler = (url) => {
-			if (url.includes("/v1/connectors/c1")) {
+			if (url.includes("/v1/connections/c1")) {
 				deleted = true;
 				return Promise.resolve(new Response(null, { status: 204 }));
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
-		const code = await run(["--json", "connector", "remove", "Prod", "--yes"]);
+		const code = await run(["--json", "connection", "remove", "Prod", "--yes"]);
 		expect(code).toBe(0);
 		expect(deleted).toBe(true);
-		expect(loadConnectors()).toHaveLength(0);
+		expect(loadConnections()).toHaveLength(0);
 	});
 
-	it("connector remove returns 1 for an unknown connector", async () => {
+	it("connection remove returns 1 for an unknown connection", async () => {
 		handler = () => Promise.resolve(jsonResponse({}));
-		const code = await run(["--json", "connector", "remove", "nope", "--yes"]);
+		const code = await run(["--json", "connection", "remove", "nope", "--yes"]);
 		expect(code).toBe(1);
 	});
 
-	it("connector remove keeps the local entry when the server delete fails", async () => {
-		writeFileSync(join(tmp, "connectors.json"), JSON.stringify([storedConnector]));
+	it("connection remove keeps the local entry when the server delete fails", async () => {
+		writeFileSync(join(tmp, "connections.json"), JSON.stringify([storedConnection]));
 		handler = (url) => {
-			if (url.includes("/v1/connectors/c1")) {
+			if (url.includes("/v1/connections/c1")) {
 				return Promise.resolve(jsonResponse({ message: "boom" }, 500));
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
-		const code = await run(["--json", "connector", "remove", "Prod", "--yes"]);
+		const code = await run(["--json", "connection", "remove", "Prod", "--yes"]);
 		expect(code).toBe(4);
-		expect(loadConnectors()).toHaveLength(1);
+		expect(loadConnections()).toHaveLength(1);
 	});
 
-	it("connector sync re-introspects the local DB and pushes the schema", async () => {
+	it("connection sync re-introspects the local DB and pushes the schema", async () => {
 		const dbFile = join(tmp, "sync.db");
 		const db = new Database(dbFile);
 		db.exec("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)");
 		db.close();
 		writeFileSync(
-			join(tmp, "connectors.json"),
+			join(tmp, "connections.json"),
 			JSON.stringify([
 				{
 					id: "c1",
@@ -154,33 +155,33 @@ describe("connector commands", () => {
 		);
 		let synced = false;
 		handler = (url) => {
-			if (url.includes("/v1/connectors/c1/sync")) {
+			if (url.includes("/v1/connections/c1/sync")) {
 				synced = true;
 				return Promise.resolve(jsonResponse({ tables: [], last_sync_at: "2026-09-10" }));
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
-		const code = await run(["--json", "connector", "sync", "Local"]);
+		const code = await run(["--json", "connection", "sync", "Local"]);
 		expect(code).toBe(0);
 		expect(synced).toBe(true);
 	});
 
-	it("connector sync returns 1 when the connector is unknown", async () => {
+	it("connection sync returns 1 when the connection is unknown", async () => {
 		handler = () => Promise.resolve(jsonResponse({}));
-		const code = await run(["--json", "connector", "sync", "nope"]);
+		const code = await run(["--json", "connection", "sync", "nope"]);
 		expect(code).toBe(1);
 	});
 
-	it("connector add fails gracefully when no DB is reachable", async () => {
+	it("connection add fails gracefully when no DB is reachable", async () => {
 		handler = (url) => {
-			if (url.endsWith("/v1/connectors")) {
+			if (url.endsWith("/v1/connections")) {
 				return Promise.resolve(jsonResponse({ id: "c1", name: "x" }, 201));
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
 		const code = await run([
 			"--json",
-			"connector",
+			"connection",
 			"add",
 			"--name",
 			"Test",
@@ -192,16 +193,16 @@ describe("connector commands", () => {
 		expect(code).toBe(1);
 	});
 
-	it("connector add accepts --type clickhouse and fails gracefully when unreachable", async () => {
+	it("connection add accepts --type clickhouse and fails gracefully when unreachable", async () => {
 		handler = (url) => {
-			if (url.endsWith("/v1/connectors")) {
+			if (url.endsWith("/v1/connections")) {
 				return Promise.resolve(jsonResponse({ id: "c1", name: "x" }, 201));
 			}
 			throw new Error(`unexpected: ${url}`);
 		};
 		const code = await run([
 			"--json",
-			"connector",
+			"connection",
 			"add",
 			"--name",
 			"CH",
@@ -213,20 +214,20 @@ describe("connector commands", () => {
 		expect(code).toBe(1);
 	});
 
-	it("connector add returns 2 when not logged in", async () => {
+	it("connection add returns 2 when not logged in", async () => {
 		writeFileSync(
 			join(tmp, "config.json"),
 			JSON.stringify({ api_url: "", api_key: "", last_login_at: "" }),
 		);
 		handler = () => Promise.resolve(jsonResponse({}));
-		const code = await run(["connector", "list"]);
+		const code = await run(["connection", "list"]);
 		expect(code).toBe(2);
 	});
 
 	it("rejects unknown --type", async () => {
 		handler = () => Promise.resolve(jsonResponse({}));
 		const code = await run([
-			"connector",
+			"connection",
 			"add",
 			"--non-interactive",
 			"--name",
@@ -240,7 +241,7 @@ describe("connector commands", () => {
 	it("--non-interactive fails when required fields are missing", async () => {
 		handler = () => Promise.resolve(jsonResponse({}));
 		// Missing --type → should fail without prompting (CI mode).
-		const code = await run(["connector", "add", "--non-interactive", "--name", "X"]);
+		const code = await run(["connection", "add", "--non-interactive", "--name", "X"]);
 		expect(code).toBe(1);
 	});
 
@@ -248,7 +249,7 @@ describe("connector commands", () => {
 		let fetched = false;
 		handler = (url) => {
 			fetched = true;
-			if (url.endsWith("/v1/connectors")) {
+			if (url.endsWith("/v1/connections")) {
 				return Promise.resolve(jsonResponse({ id: "c1", name: "x" }, 201));
 			}
 			throw new Error(`unexpected: ${url}`);
@@ -256,7 +257,7 @@ describe("connector commands", () => {
 		// Provide everything but the password — non-interactive must fail before hitting the API.
 		const code = await run([
 			"--json",
-			"connector",
+			"connection",
 			"add",
 			"--non-interactive",
 			"--name",

@@ -1,33 +1,34 @@
 /**
- * `easysql connector add|sync|list` — manage local connectors.
+ * `easysql connection add|sync|list` — manage local connections.
  *
  * `add` introspects a LOCAL MySQL/PostgreSQL/ClickHouse/SQLite database and
  * pushes ONLY the schema metadata to the EasySQL API. Credentials never leave
- * the host. SQLite connectors have no credentials — the connection parameter
+ * the host. SQLite connections have no credentials — the connection parameter
  * is the absolute path to a `.db` file.
  *
  * `sync` re-extracts the schema from a registered local DB and updates
  * the API-side cache.
  *
- * `list` shows the connectors known to the user's EasySQL account.
+ * `list` shows the connections known to the user's EasySQL account.
  *
  * `add` is interactive by default: when a required flag is missing, the
  * CLI asks for it via promptLine. Pass --non-interactive (alias -y) to
  * disable prompts and fail with a clear error instead.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { isatty } from "node:tty";
 import type { Command } from "commander";
 import { ApiError, CliError, NotLoggedInError } from "../cli/errors.js";
 import {
-	findConnectorById,
-	findConnectorByName,
-	loadConnectors,
-	removeConnector,
-	upsertConnector,
-} from "../config/connectors-store.js";
+	findConnectionById,
+	findConnectionByName,
+	loadConnections,
+	removeConnection,
+	upsertConnection,
+} from "../config/connections-store.js";
 import { keyringDelete } from "../config/keyring.js";
 import {
 	introspectDatabase,
@@ -35,15 +36,15 @@ import {
 	type ParsedConnection,
 	parseConnectionUrl,
 } from "../db/introspect.js";
-import { resolveDbPassword, saveDbPassword } from "../db/password.js";
+import { type PasswordTarget, resolveDbPassword, saveDbPassword } from "../db/password.js";
 import { DB_TYPE_LIST, DEFAULT_PORTS, SUPPORTED_DB_TYPES } from "../db/schema.js";
-import { syncLocalConnector } from "../db/sync-connector.js";
+import { syncLocalConnection } from "../db/sync-connection.js";
 import { t } from "../i18n/messages.js";
 import { printError, printInfo, printSuccess } from "../output/print.js";
 import { getSavedClient } from "../sdk/client.js";
 import { promptLine, promptLineDefault } from "../util/prompt.js";
 
-interface ConnectorAddOptions {
+interface ConnectionAddOptions {
 	name?: string;
 	type?: string;
 	connectionUrl?: string;
@@ -81,10 +82,13 @@ async function askLine(
 	return answer.trim();
 }
 
-async function resolveConnection(opts: ConnectorAddOptions): Promise<ParsedConnection> {
+async function resolveConnection(
+	opts: ConnectionAddOptions,
+	uid: string,
+): Promise<ParsedConnection> {
 	const nonInteractive = !!opts.nonInteractive;
 
-	const name = opts.name ?? (await askLine("Connector name", undefined, nonInteractive));
+	const name = opts.name ?? (await askLine("Connection name", undefined, nonInteractive));
 	if (!name) throw new CliError("--name is required.", 1);
 
 	const rawType =
@@ -101,11 +105,11 @@ async function resolveConnection(opts: ConnectorAddOptions): Promise<ParsedConne
 	if (type === "sqlite") {
 		return resolveSqliteConnection(opts, nonInteractive);
 	}
-	return resolveNetworkConnection(opts, name, type, nonInteractive);
+	return resolveNetworkConnection(opts, { uid, name }, type, nonInteractive);
 }
 
 async function resolveSqliteConnection(
-	opts: ConnectorAddOptions,
+	opts: ConnectionAddOptions,
 	nonInteractive: boolean,
 ): Promise<ParsedConnection> {
 	const rawFile =
@@ -113,7 +117,7 @@ async function resolveSqliteConnection(
 		opts.connectionUrl ??
 		(await askLine("SQLite file path (absolute)", undefined, nonInteractive));
 	if (!rawFile) {
-		throw new CliError("--file is required for sqlite connectors.", 1);
+		throw new CliError("--file is required for sqlite connections.", 1);
 	}
 	const file = normalizeSqliteFile(rawFile);
 	if (!existsSync(file)) {
@@ -141,8 +145,8 @@ function normalizeSqliteFile(raw: string): string {
 }
 
 async function resolveNetworkConnection(
-	opts: ConnectorAddOptions,
-	name: string,
+	opts: ConnectionAddOptions,
+	target: PasswordTarget,
 	type: Exclude<ParsedConnection["type"], "sqlite">,
 	nonInteractive: boolean,
 ): Promise<ParsedConnection> {
@@ -177,7 +181,7 @@ async function resolveNetworkConnection(
 
 		let password = opts.password ?? "";
 		if (!password) {
-			const resolved = await resolveDbPassword(name, {
+			const resolved = await resolveDbPassword(target, {
 				prompt: nonInteractive ? async () => null : undefined,
 			});
 			password = resolved.password;
@@ -201,7 +205,7 @@ async function resolveNetworkConnection(
 	}
 
 	if (!conn.password) {
-		const resolved = await resolveDbPassword(name, {
+		const resolved = await resolveDbPassword(target, {
 			prompt: nonInteractive ? async () => null : undefined,
 		});
 		conn.password = resolved.password;
@@ -217,17 +221,20 @@ async function resolveNetworkConnection(
 }
 
 /** Opt-in keyring persistence — failure is reported but never fatal. */
-async function storePassword(name: string, password: string): Promise<void> {
+async function storePassword(target: PasswordTarget, password: string): Promise<void> {
 	try {
-		await saveDbPassword(name, password);
-		printInfo(t().success.passwordSavedKeyring(name));
+		await saveDbPassword(target, password);
+		printInfo(t().success.passwordSavedKeyring(target.name));
 	} catch (err) {
 		printError(t().errors.keyringSaveFailed(err instanceof Error ? err.message : String(err)));
 	}
 }
 
-function persistConnector(opts: ConnectorAddOptions, conn: ParsedConnection): StoredConnectorView {
-	const entry: StoredConnectorView = {
+function persistConnection(
+	opts: ConnectionAddOptions,
+	conn: ParsedConnection,
+): StoredConnectionView {
+	const entry: StoredConnectionView = {
 		name: opts.name ?? "",
 		type: conn.type,
 		host: conn.host,
@@ -240,7 +247,7 @@ function persistConnector(opts: ConnectorAddOptions, conn: ParsedConnection): St
 	return entry;
 }
 
-interface StoredConnectorView {
+interface StoredConnectionView {
 	id?: string;
 	name: string;
 	type: ParsedConnection["type"];
@@ -255,8 +262,8 @@ interface StoredConnectorView {
 function registerAdd(program: Command): void {
 	program
 		.command("add")
-		.description("Add a local MySQL/Postgres/ClickHouse/SQLite connector (schema-only)")
-		.option("--name <name>", "Connector name")
+		.description("Add a local MySQL/Postgres/ClickHouse/SQLite connection (schema-only)")
+		.option("--name <name>", "Connection name")
 		.option("--type <type>", DB_TYPE_LIST)
 		.option("--connection-url <url>", "Full connection URL")
 		.option("--file <path>", "SQLite file path (when --type sqlite)")
@@ -268,10 +275,15 @@ function registerAdd(program: Command): void {
 		.option("--ssl", "Require SSL/TLS")
 		.option("--save-password", "Persist the password in the OS keyring (never sent to the API)")
 		.option("-y, --non-interactive", "Disable prompts; fail when required values are missing")
-		.action(async (opts: ConnectorAddOptions) => {
+		.action(async (opts: ConnectionAddOptions) => {
+			// Reuse the uid of an existing same-name connection so re-adding does
+			// not orphan its keyring entry; otherwise mint a fresh one.
+			const uid =
+				(opts.name ? findConnectionByName(opts.name)?.uid : undefined) ?? randomUUID();
+
 			let conn: ParsedConnection;
 			try {
-				conn = await resolveConnection(opts);
+				conn = await resolveConnection(opts, uid);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				printError(msg);
@@ -282,26 +294,27 @@ function registerAdd(program: Command): void {
 			const schema = await introspectDatabase(conn);
 
 			const { client } = getSavedClient();
-			const result = (await client.createConnector({
+			const result = (await client.createConnection({
 				name: opts.name,
 				type: conn.type,
 				schema,
 			})) as { id?: string; name?: string };
 
-			const entry = persistConnector(opts, conn);
+			const entry = persistConnection(opts, conn);
 			const finalName = result.name ?? opts.name ?? entry.name;
-			upsertConnector({
+			upsertConnection({
 				...entry,
+				uid,
 				id: result.id,
 				name: finalName,
 			});
 
 			if (opts.savePassword && conn.password && conn.type !== "sqlite") {
-				await storePassword(finalName, conn.password);
+				await storePassword({ uid, name: finalName }, conn.password);
 			}
 
 			printSuccess(
-				t().success.connectorAdded(result.name ?? opts.name ?? "", result.id ?? ""),
+				t().success.connectionAdded(result.name ?? opts.name ?? "", result.id ?? ""),
 			);
 		});
 }
@@ -309,8 +322,8 @@ function registerAdd(program: Command): void {
 function registerSync(program: Command): void {
 	program
 		.command("sync [name]")
-		.description("Re-introspect a local connector and push the updated schema")
-		.option("--id <id>", "Sync a specific connector by id")
+		.description("Re-introspect a local connection and push the updated schema")
+		.option("--id <id>", "Sync a specific connection by id")
 		.option("--password <pass>", "Database password (otherwise $EASYSQL_DB_PASSWORD or prompt)")
 		.option("--save-password", "Persist the password in the OS keyring (never sent to the API)")
 		.option("-y, --non-interactive", "Disable prompts; fail when the password is missing")
@@ -325,24 +338,24 @@ function registerSync(program: Command): void {
 				},
 			) => {
 				let stored = opts.id
-					? findConnectorById(opts.id)
+					? findConnectionById(opts.id)
 					: name
-						? findConnectorByName(name)
+						? findConnectionByName(name)
 						: undefined;
 				if (!stored && !opts.id && !name) {
-					const list = loadConnectors();
+					const list = loadConnections();
 					if (list.length === 1) stored = list[0];
 				}
 				if (!stored) {
-					const list = loadConnectors();
+					const list = loadConnections();
 					if (list.length === 0) {
 						throw new CliError(
-							"No local connectors to sync. Run `easysql connector add` first.",
+							"No local connections to sync. Run `easysql connection add` first.",
 							1,
 						);
 					}
 					throw new CliError(
-						`Specify a connector to sync: ${list.map((c) => c.name).join(", ")}`,
+						`Specify a connection to sync: ${list.map((c) => c.name).join(", ")}`,
 						1,
 					);
 				}
@@ -352,7 +365,7 @@ function registerSync(program: Command): void {
 					if (opts.password && opts.password.length > 0) {
 						password = opts.password;
 					} else {
-						const resolved = await resolveDbPassword(stored.name, {
+						const resolved = await resolveDbPassword(stored, {
 							prompt: opts.nonInteractive ? async () => null : undefined,
 						});
 						password = resolved.password;
@@ -369,11 +382,11 @@ function registerSync(program: Command): void {
 				}
 
 				printInfo(t().info.introspectingDb);
-				const result = await syncLocalConnector(stored, password);
+				const result = await syncLocalConnection(stored, password);
 				if (opts.savePassword && password && stored.type !== "sqlite") {
-					await storePassword(stored.name, password);
+					await storePassword(stored, password);
 				}
-				printSuccess(t().success.connectorSynced(stored.name, result.tables ?? 0));
+				printSuccess(t().success.connectionSynced(stored.name, result.tables ?? 0));
 			},
 		);
 }
@@ -381,18 +394,18 @@ function registerSync(program: Command): void {
 function registerRemove(program: Command): void {
 	program
 		.command("remove <name>")
-		.description("Remove a local connector (and delete it from EasySQL)")
+		.description("Remove a local connection (and delete it from EasySQL)")
 		.option("-y, --yes", "Skip the confirmation prompt")
 		.action(async (name: string, opts: { yes?: boolean }) => {
-			const stored = findConnectorByName(name);
-			if (!stored) throw new CliError(t().errors.connectorNotFound(name), 1);
+			const stored = findConnectionByName(name);
+			if (!stored) throw new CliError(t().errors.connectionNotFound(name), 1);
 
 			if (!opts.yes) {
 				if (!isatty(0)) {
 					throw new CliError(t().errors.removeNonInteractive, 1);
 				}
 				const answer = await promptLine(`${t().prompts.confirmRemove(name)} `);
-				if (!answer || !answer.trim().toLowerCase().startsWith("y")) {
+				if (!answer?.trim().toLowerCase().startsWith("y")) {
 					printInfo(t().info.removeAborted);
 					return;
 				}
@@ -401,39 +414,36 @@ function registerRemove(program: Command): void {
 			if (stored.id) {
 				try {
 					const { client } = getSavedClient();
-					await client.deleteConnector(stored.id);
+					await client.deleteConnection(stored.id);
 				} catch (err) {
 					if (err instanceof ApiError && err.status === 404) {
 						// Already gone server-side — proceed with the local cleanup.
 					} else if (err instanceof NotLoggedInError) {
-						printInfo(t().info.connectorRemovedLocalOnly);
+						printInfo(t().info.connectionRemovedLocalOnly);
 					} else {
 						throw err;
 					}
 				}
 			}
 
-			removeConnector(name);
-			try {
-				await keyringDelete(name);
-			} catch {
-				// best-effort: a leftover keyring entry is harmless
-			}
-			printSuccess(t().success.connectorRemoved(name));
+			removeConnection(name);
+			await keyringDelete(stored.uid);
+			if (stored.name !== stored.uid) await keyringDelete(stored.name);
+			printSuccess(t().success.connectionRemoved(name));
 		});
 }
 
 function registerList(program: Command): void {
 	program
 		.command("list")
-		.description("List connectors known to EasySQL")
+		.description("List connections known to EasySQL")
 		.action(async () => {
 			const { client } = getSavedClient();
-			const result = (await client.listConnectors()) as unknown;
+			const result = (await client.listConnections()) as unknown;
 			if (Array.isArray(result)) {
 				if (result.length === 0) {
 					console.log(
-						"(no connectors yet — run `easysql connector add` or `easysql demo`)",
+						"(no connections yet — run `easysql connection add` or `easysql demo`)",
 					);
 					return;
 				}
@@ -451,8 +461,8 @@ function registerList(program: Command): void {
 		});
 }
 
-export function registerConnector(program: Command): void {
-	const group = program.command("connector").description("Manage local connectors");
+export function registerConnection(program: Command): void {
+	const group = program.command("connection").description("Manage local connections");
 	registerAdd(group);
 	registerSync(group);
 	registerRemove(group);

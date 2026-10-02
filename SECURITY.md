@@ -23,10 +23,10 @@ This repository covers the open-source `easysql-cli` (the npm package `@easysql/
 The CLI is designed around one invariant: **database credentials never leave the host.**
 
 - Only schema metadata is sent to the API (`tables`, `columns`, `types`, `primary_keys`, `foreign_keys`, `row_count_estimate`). Passwords, hosts and ports are never transmitted.
-- Database passwords are resolved locally in this order: `$EASYSQL_DB_PASSWORD` → OS keyring (macOS Keychain / libsecret / Windows Credential Manager; opt-in via `connector add --save-password` or `connector sync --save-password`) → interactive prompt. `connectors.json` never contains a password, and nothing in this chain is ever sent to the API. Set `EASYSQL_KEYRING=0` to disable keyring use entirely.
+- Database passwords are resolved locally in this order: `$EASYSQL_DB_PASSWORD` → OS keyring (macOS Keychain / libsecret / Windows Credential Manager; opt-in via `connection add --save-password` or `connection sync --save-password`) → interactive prompt. `connections.json` never contains a password, and nothing in this chain is ever sent to the API. Set `EASYSQL_KEYRING=0` to disable keyring use entirely.
 - The EasySQL API key is stored in `~/.config/easysql/config.json` with `0600` permissions (best-effort on Windows).
 - Generated SQL is validated server-side, and the CLI additionally rejects any non-SELECT statement before touching the local database (defense in depth).
-- SQLite connectors carry no credentials at all; the file path stays in the local `connectors.json`.
+- SQLite connections carry no credentials at all; the file path stays in the local `connections.json`.
 
 ## Supported versions
 

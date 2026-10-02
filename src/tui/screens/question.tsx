@@ -1,6 +1,6 @@
 /**
  * Question screen — type a natural-language question, get SQL from the
- * EasySQL API, execute it locally against the active connector, and
+ * EasySQL API, execute it locally against the active connection, and
  * render the result table inline.
  *
  * The input box accepts free text. Typing `/` switches the input into
@@ -11,7 +11,7 @@
  * Slash commands recognised here:
  *   /help             — open the help overlay (App-level)
  *   /quit             — quit the TUI
- *   /connectors       — switch to Connectors
+ *   /connections       — switch to Connections
  *   /history          — switch to History
  *   /question         — switch to Question (no-op)
  *   /clear            — clear the buffer + result panel
@@ -25,10 +25,10 @@
 import { Box, Text, useInput } from "ink";
 import { useEffect, useState } from "react";
 import {
-	findConnectorByName,
-	type StoredConnector,
-	upsertConnector,
-} from "../../config/connectors-store.js";
+	findConnectionByName,
+	type StoredConnection,
+	upsertConnection,
+} from "../../config/connections-store.js";
 import { executeSelect, type LocalQueryResult } from "../../db/execute.js";
 import { storedPassword } from "../../db/password.js";
 import { appendHistory } from "../../history/store.js";
@@ -36,21 +36,21 @@ import { t } from "../../i18n/messages.js";
 import {
 	type AuthenticatedClient,
 	getSavedClient,
-	isConnectorNotFoundError,
+	isConnectionNotFoundError,
 } from "../../sdk/client.js";
 import type { ScreenName } from "../app.js";
 import { Cursor } from "../cursor.js";
 import { ResultTable } from "../result-table.js";
 import { Spinner } from "../spinner.js";
 import { SqlText } from "../sql-highlight.js";
-import { ConnectorSync } from "./connector-sync.js";
+import { ConnectionSync } from "./connection-sync.js";
 import { LoginScreen, type LoggedInUser } from "./login.js";
 import { UsageView } from "./usage.js";
 
 type Status = "idle" | "generating" | "executing" | "ok" | "error";
 
 interface Props {
-	connector: string;
+	connection: string;
 	onBusyChange?: (busy: boolean) => void;
 	onSwitchScreen?: (s: ScreenName) => void;
 	onOpenHelp?: () => void;
@@ -75,7 +75,7 @@ interface QueryResponse {
  */
 interface PendingExecution {
 	client: AuthenticatedClient;
-	connector: StoredConnector;
+	connection: StoredConnection;
 	sql: string;
 	queryId?: string;
 }
@@ -102,10 +102,10 @@ function parseSlash(cmd: string): SlashCmd | { kind: "unknown"; raw: string } {
 		case "q":
 		case "exit":
 			return { kind: "quit" };
-		case "connectors":
+		case "connections":
 		case "c":
 		case "1":
-			return { kind: "screen", screen: "connectors" };
+			return { kind: "screen", screen: "connections" };
 		case "history":
 		case "h2":
 		case "2":
@@ -142,11 +142,11 @@ interface SlashCommand {
 
 const SLASH_COMMANDS: SlashCommand[] = [
 	{ name: "help", aliases: ["h", "?"], desc: "Show keybindings" },
-	{ name: "connectors", aliases: ["c", "1"], desc: "Go to Connectors" },
+	{ name: "connections", aliases: ["c", "1"], desc: "Go to Connections" },
 	{ name: "history", aliases: ["h2", "2"], desc: "Go to History" },
 	{ name: "question", aliases: ["q2", "3"], desc: "Go to Question" },
 	{ name: "clear", aliases: ["cls"], desc: "Clear buffer and result" },
-	{ name: "sync", aliases: ["sy"], desc: "Sync the active connector" },
+	{ name: "sync", aliases: ["sy"], desc: "Sync the active connection" },
 	{ name: "usage", aliases: ["u"], desc: "Show plan usage/quota" },
 	{ name: "logout", aliases: ["lo"], desc: "Log out (clear credentials)" },
 	{ name: "login", aliases: ["li"], desc: "Log in with an API key" },
@@ -162,7 +162,7 @@ function filterCommands(query: string): SlashCommand[] {
 }
 
 export function QuestionScreen({
-	connector,
+	connection,
 	onBusyChange,
 	onSwitchScreen,
 	onOpenHelp,
@@ -183,7 +183,7 @@ export function QuestionScreen({
 	const [busy, setBusy] = useState(false);
 	const [pending, setPending] = useState<PendingExecution | null>(null);
 	const [password, setPassword] = useState("");
-	const [syncTarget, setSyncTarget] = useState<StoredConnector | null>(null);
+	const [syncTarget, setSyncTarget] = useState<StoredConnection | null>(null);
 	const [usageOpen, setUsageOpen] = useState(false);
 	const [loginOpen, setLoginOpen] = useState(false);
 
@@ -252,9 +252,9 @@ export function QuestionScreen({
 					setSlashHint(null);
 					return;
 					case "sync": {
-						const target = findConnectorByName(connector);
+						const target = findConnectionByName(connection);
 						if (!target) {
-							setSlashHint(`No connector named '${connector}'.`);
+							setSlashHint(`No connection named '${connection}'.`);
 							return;
 						}
 						setSyncTarget(target);
@@ -348,9 +348,9 @@ export function QuestionScreen({
 		}
 	});
 
-	function fail(e: unknown, connectorName: string): void {
-		if (isConnectorNotFoundError(e)) {
-			setErr(t().errors.connectorNotFoundOnApi(connectorName));
+	function fail(e: unknown, connectionName: string): void {
+		if (isConnectionNotFoundError(e)) {
+			setErr(t().errors.connectionNotFoundOnApi(connectionName));
 		} else {
 			setErr(e instanceof Error ? e.message : String(e));
 		}
@@ -358,10 +358,8 @@ export function QuestionScreen({
 	}
 
 	async function finishExecution(
-		client: AuthenticatedClient,
-		stored: StoredConnector,
+		stored: StoredConnection,
 		generated: string,
-		queryId: string | undefined,
 		pw: string,
 		question: string,
 	): Promise<void> {
@@ -381,18 +379,13 @@ export function QuestionScreen({
 		setResult(r);
 		setStatus("ok");
 
-		upsertConnector({ ...stored, updated_at: new Date().toISOString() });
-		try {
-			if (queryId) {
-				await client.answerQuery({ result_data: r.rows }, queryId);
-			}
-		} catch {
-			// answer upload is best-effort; the table is already shown
-		}
+		// EZSQL-37: no answer upload — the API never receives result rows;
+		// the local table above is the rendered answer.
+		upsertConnection({ ...stored, updated_at: new Date().toISOString() });
 		appendHistory({
 			at: new Date().toISOString(),
 			question,
-			connector: stored.name,
+			connection: stored.name,
 			sql: generated,
 			row_count: r.row_count,
 			duration_ms: r.duration_ms,
@@ -405,16 +398,9 @@ export function QuestionScreen({
 		setBusy(true);
 		setErr(null);
 		try {
-			await finishExecution(
-				pending.client,
-				pending.connector,
-				pending.sql,
-				pending.queryId,
-				password,
-				asked ?? "",
-			);
+			await finishExecution(pending.connection, pending.sql, password, asked ?? "");
 		} catch (e) {
-			fail(e, pending.connector.name);
+			fail(e, pending.connection.name);
 		} finally {
 			setPending(null);
 			setPassword("");
@@ -425,9 +411,9 @@ export function QuestionScreen({
 	async function runFlow() {
 		const question = buf.trim();
 		if (question.length === 0) return;
-		const stored = findConnectorByName(connector);
+		const stored = findConnectionByName(connection);
 		if (!stored?.id) {
-			setErr(`No connector named '${connector}'.`);
+			setErr(`No connection named '${connection}'.`);
 			setStatus("error");
 			return;
 		}
@@ -442,28 +428,28 @@ export function QuestionScreen({
 			setStatus("generating");
 			const { client } = getSavedClient();
 			const createRes = (await client.createQuery({
-				connector_id: stored.id,
+				connection_id: stored.id,
 				question,
 			})) as QueryResponse;
 			const generated = createRes.sql_generated ?? createRes.sql ?? "";
 			setSql(generated);
 
 			const direct =
-				stored.type === "sqlite" ? "" : ((await storedPassword(stored.name)) ?? "");
+				stored.type === "sqlite" ? "" : ((await storedPassword(stored)) ?? "");
 			if (stored.type !== "sqlite" && direct.length === 0) {
 				// Ask for the password inline: a raw-mode stderr prompt would
 				// be erased by ink's redraws and look like a hang.
 				setStatus("idle");
 				setPending({
 					client,
-					connector: stored,
+					connection: stored,
 					sql: generated,
 					queryId: createRes.id,
 				});
 				return;
 			}
 
-			await finishExecution(client, stored, generated, createRes.id, direct, question);
+			await finishExecution(stored, generated, direct, question);
 		} catch (e) {
 			fail(e, stored.name);
 		} finally {
@@ -499,7 +485,7 @@ export function QuestionScreen({
 				{pending && (
 					<Box marginTop={1} flexDirection="column">
 						<Text color="cyan">
-							Password for {pending.connector.name} ({pending.connector.type})
+							Password for {pending.connection.name} ({pending.connection.type})
 						</Text>
 						<Text>
 							{"*".repeat(password.length)}
@@ -545,8 +531,8 @@ export function QuestionScreen({
 			) : usageOpen ? (
 				<UsageView onExit={() => setUsageOpen(false)} />
 			) : syncTarget ? (
-				<ConnectorSync
-					connector={syncTarget}
+				<ConnectionSync
+					connection={syncTarget}
 					title="/sync"
 					onExit={() => setSyncTarget(null)}
 				/>

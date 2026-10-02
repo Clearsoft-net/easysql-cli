@@ -15,11 +15,11 @@ beforeEach(() => {
 		join(tmpDir, "config.json"),
 		JSON.stringify({ api_url: "", api_key: "", last_login_at: "" }),
 	);
-	// Seed a connector so the Question screen renders (otherwise
+	// Seed a connection so the Question screen renders (otherwise
 	// slash-prompt tests fail because the screen is replaced with
-	// a "Pick a connector first" placeholder).
+	// a "Pick a connection first" placeholder).
 	writeFileSync(
-		join(tmpDir, "connectors.json"),
+		join(tmpDir, "connections.json"),
 		JSON.stringify([
 			{
 				id: "demo-id",
@@ -48,9 +48,9 @@ describe("TUI App", () => {
 		const { lastFrame } = render(<App />);
 		const frame = lastFrame();
 		expect(frame).toContain("easysql");
-		expect(frame).toContain("connector:");
+		expect(frame).toContain("connection:");
 		expect(frame).toContain("local-demo");
-		expect(frame).toContain("Connectors");
+		expect(frame).toContain("Connections");
 		expect(frame).toContain("History");
 		expect(frame).toContain("Question");
 		expect(frame).toContain("▸ Question");
@@ -77,18 +77,18 @@ describe("TUI App", () => {
 		expect(lastFrame()).toContain("Pro");
 	});
 
-	it("Tab cycles from Question to Connectors", async () => {
+	it("Tab cycles from Question to Connections", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("\t");
 		await new Promise((r) => setTimeout(r, 50));
 		const frame = lastFrame();
-		expect(frame).toContain("▸ Connectors");
+		expect(frame).toContain("▸ Connections");
 		expect(frame).not.toContain("▸ Question");
 	});
 
-	it("Tab from Connectors jumps to History (skips the empty default position)", async () => {
+	it("Tab from Connections jumps to History (skips the empty default position)", async () => {
 		const { lastFrame, stdin } = render(<App />);
-		stdin.write("\t"); // → Connectors
+		stdin.write("\t"); // → Connections
 		await new Promise((r) => setTimeout(r, 50));
 		stdin.write("\t"); // → History
 		await new Promise((r) => setTimeout(r, 50));
@@ -98,7 +98,7 @@ describe("TUI App", () => {
 
 	it("Shift+Tab from History goes back to Question", async () => {
 		const { lastFrame, stdin } = render(<App />);
-		stdin.write("\t"); // → Connectors
+		stdin.write("\t"); // → Connections
 		await new Promise((r) => setTimeout(r, 50));
 		stdin.write("\t"); // → History
 		await new Promise((r) => setTimeout(r, 50));
@@ -126,7 +126,7 @@ describe("TUI App", () => {
 		await new Promise((r) => setTimeout(r, 50));
 		const frame = lastFrame();
 		expect(frame).toContain("/help");
-		expect(frame).toContain("/connectors");
+		expect(frame).toContain("/connections");
 		expect(frame).toContain("/history");
 		expect(frame).toContain("↑/↓ select");
 	});
@@ -139,7 +139,7 @@ describe("TUI App", () => {
 		await new Promise((r) => setTimeout(r, 50));
 		const frame = lastFrame();
 		expect(frame).toContain("/help");
-		expect(frame).not.toContain("/connectors");
+		expect(frame).not.toContain("/connections");
 	});
 
 	it("/help from slash-prompt opens the help modal", async () => {
@@ -177,42 +177,97 @@ describe("TUI App", () => {
 		expect(lastFrame()).not.toContain("keybindings");
 	});
 
-	it("Connectors: the trailing '+ Add a connector…' row opens the add form", async () => {
+	it("Connections: the trailing '+ Add a connection…' row opens the add form", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("\t");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).toContain("+ Add a connector");
-		stdin.write("j"); // move off the connector onto the add row
+		expect(lastFrame()).toContain("+ Add a connection");
+		stdin.write("j"); // move off the connection onto the add row
 		await new Promise((r) => setTimeout(r, 50));
 		stdin.write("\r"); // Enter
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).toContain("Add connector");
+		expect(lastFrame()).toContain("Add connection");
 		stdin.write("\u001b");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).not.toContain("Add connector");
-		expect(lastFrame()).toContain("Connectors (1)");
+		expect(lastFrame()).not.toContain("Add connection");
+		expect(lastFrame()).toContain("Connections (1)");
 	});
 
-	it("Connectors: 'd' opens the remove confirmation", async () => {
+	it("Connections: the add form remembers the password by default", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		const ESC = String.fromCharCode(27);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("j");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Add connection");
+		expect(lastFrame()).toContain("Remember password");
+		expect(lastFrame()).toContain("[x] saved in the OS keyring");
+		// six downs lands on the switch, right arrow flips it off
+		for (let i = 0; i < 6; i++) {
+			stdin.write(ESC + "[B");
+			await new Promise((r) => setTimeout(r, 25));
+		}
+		stdin.write(ESC + "[C");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("[ ] do not save");
+	});
+
+	it("Connections: the add form rejects a name already in use", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("j");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Add connection");
+		stdin.write("local-demo");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("already exists");
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Error:");
+		expect(lastFrame()).toContain("Add connection");
+	});
+
+	it("Connections: 'e' opens the edit form for the highlighted connection", async () => {
+		const { lastFrame, stdin } = render(<App />);
+		stdin.write("\t");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("e");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).toContain("Edit connection");
+		expect(lastFrame()).toContain("local-demo");
+		expect(lastFrame()).toContain("File (absolute path)");
+		stdin.write(String.fromCharCode(27));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(lastFrame()).not.toContain("Edit connection");
+		expect(lastFrame()).toContain("Connections (1)");
+	});
+
+	it("Connections: 'd' opens the remove confirmation", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("\t");
 		await new Promise((r) => setTimeout(r, 50));
 		stdin.write("d");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).toContain("Remove connector");
+		expect(lastFrame()).toContain("Remove connection");
 		expect(lastFrame()).toContain("local-demo");
 	});
 
-	it("Connectors: 's' opens the sync runner", async () => {
+	it("Connections: 's' opens the sync runner", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("\t");
 		await new Promise((r) => setTimeout(r, 50));
 		stdin.write("s");
 		await new Promise((r) => setTimeout(r, 50));
-		expect(lastFrame()).toContain("Sync connector: local-demo");
+		expect(lastFrame()).toContain("Sync connection: local-demo");
 	});
 
-	it("Question: '/sync' opens the sync runner for the active connector", async () => {
+	it("Question: '/sync' opens the sync runner for the active connection", async () => {
 		const { lastFrame, stdin } = render(<App />);
 		stdin.write("/sync");
 		await new Promise((r) => setTimeout(r, 50));
@@ -259,7 +314,7 @@ describe("TUI App", () => {
 				}),
 			);
 			writeFileSync(
-				join(tmpDir as string, "connectors.json"),
+				join(tmpDir as string, "connections.json"),
 				JSON.stringify([
 					{
 						id: "ch-id",
@@ -343,14 +398,14 @@ describe("TUI App", () => {
 		expect(lastFrame()).toContain("Type · Enter submit · Backspace delete");
 	});
 
-	it("renders the Question empty state when there are no connectors", () => {
-		// Wipe the connector store for this one test.
+	it("renders the Question empty state when there are no connections", () => {
+		// Wipe the connection store for this one test.
 		if (tmpDir) {
 			const fs = require("node:fs");
-			fs.unlinkSync(join(tmpDir, "connectors.json"));
+			fs.unlinkSync(join(tmpDir, "connections.json"));
 		}
 		const { lastFrame } = render(<App />);
-		expect(lastFrame()).toContain("No connector selected");
+		expect(lastFrame()).toContain("No connection selected");
 	});
 
 	it("frame fills the full terminal height (regression: no black gap above the TUI)", () => {

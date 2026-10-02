@@ -43,7 +43,7 @@ export function registerHistory(program: Command): void {
 							? "GENERATE-ONLY"
 							: `ERROR: ${e.error ?? "unknown"}`;
 				console.log(
-					`${e.at}  [${e.connector}]  ${status}\n    Q: ${e.question}${
+					`${e.at}  [${e.connection}]  ${status}\n    Q: ${e.question}${
 						e.sql ? `\n    SQL: ${e.sql.replace(/\s+/g, " ").slice(0, 120)}` : ""
 					}`,
 				);

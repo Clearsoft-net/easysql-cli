@@ -5,7 +5,7 @@
     "": {
       "name": "@easysql/cli",
       "dependencies": {
-        "@easysql/client": "^2.2.0",
+        "@easysql/client": "^3.0.0",
         "@easysql/common": "^2.2.0",
         "@easysql/connector-sqlite": "^2.2.0",
         "@easysql/schema-generation": "^2.2.0",
@@ -55,7 +55,7 @@
 
     "@clickhouse/client": ["@clickhouse/client@1.23.1", "", {}, "sha512-vs3/Zc1dHvT171btW5nMoPsPCJ6QVJ5pp7obxzO5sjqwFx/jjz9wwCAqcFOdc2DhprugDBaVn+4dVY8hG3A9nw=="],
 
-    "@easysql/client": ["@easysql/client@2.2.0", "", { "dependencies": { "openapi-fetch": "^0.13.0" } }, "sha512-9adl+rxkzUh1En0u9T4NniAUJ4fQmW3G6yBPlTlY5PJIPIpLDHJO7mtCukRkYyh64Tywuif+sUHeXtqzO+3yhQ=="],
+    "@easysql/client": ["@easysql/client@3.0.0", "", { "dependencies": { "openapi-fetch": "^0.13.0" } }, "sha512-JQvx53nzLGQkPsLeKv0d8kK8uq0JQePWrwKIt5UF4cHeScHMpvbkPSnckd9UhTZD5d3Xu3jPWSyJmXfME6wNDg=="],
 
     "@easysql/common": ["@easysql/common@2.2.0", "", {}, "sha512-kwb3VJf4gQhso+s+d1A+8kRXJVmFXX462UA4XP6xCyMOXfiA1FqTzHV7XKi+bxiiibLjejR3o8tCFDdRor3b/w=="],
 

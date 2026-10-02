@@ -28,7 +28,7 @@
 		"check": "biome check . && tsc --noEmit"
 	},
 	"dependencies": {
-		"@easysql/client": "^2.2.0",
+		"@easysql/client": "^3.0.0",
 		"@easysql/common": "^2.2.0",
 		"@easysql/connector-sqlite": "^2.2.0",
 		"@easysql/schema-generation": "^2.2.0",

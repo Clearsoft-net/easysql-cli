@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.5.0]
+
+### Changed
+
+- **BREAKING CHANGE:** renamed `connector` to `connection` throughout — the command group is now `easysql connection add|sync|list|remove` (flag `--connection`), the local registry is `connections.json`, and the TUI screen/slash command is `Connections` / `/connections`. `connector` now refers only to the database engine/driver (`@easysql/connector-*`).
+- Updated `@easysql/client` to `^3.0.0`, matching the API rename of `/v1/connectors` to `/v1/connections` and `connector_id` to `connection_id`. Result-row upload was removed (the API no longer accepts it); the CLI renders results locally.
+
 ## [0.4.0]
 
 ### Added
@@ -50,7 +57,8 @@ All notable changes to this project are documented here. The format is based on 
 - Standalone binaries for linux/darwin (x64, arm64) and windows-x64 via GitHub Releases.
 - Local SQL validator (defense in depth) and XDG-compliant storage with `0600` permissions.
 
-[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.0

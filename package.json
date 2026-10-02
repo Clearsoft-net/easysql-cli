@@ -1,6 +1,6 @@
 {
 	"name": "@easysql/cli",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"description": "EasySQL CLI/TUI — run natural-language queries against your local MySQL, PostgreSQL, ClickHouse or SQLite database using the EasySQL API.",
 	"type": "module",
 	"bin": {

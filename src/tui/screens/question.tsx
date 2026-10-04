@@ -50,7 +50,7 @@ import { UsageView } from "./usage.js";
 type Status = "idle" | "generating" | "executing" | "ok" | "error";
 
 interface Props {
-	connection: string;
+	connection?: string;
 	onBusyChange?: (busy: boolean) => void;
 	onSwitchScreen?: (s: ScreenName) => void;
 	onOpenHelp?: () => void;
@@ -252,9 +252,13 @@ export function QuestionScreen({
 					setSlashHint(null);
 					return;
 					case "sync": {
-						const target = findConnectionByName(connection);
+						const target = connection ? findConnectionByName(connection) : undefined;
 						if (!target) {
-							setSlashHint(`No connection named '${connection}'.`);
+							setSlashHint(
+								connection
+									? `No connection named '${connection}'.`
+									: "No connection selected — pick one in Connections.",
+							);
 							return;
 						}
 						setSyncTarget(target);
@@ -411,9 +415,13 @@ export function QuestionScreen({
 	async function runFlow() {
 		const question = buf.trim();
 		if (question.length === 0) return;
-		const stored = findConnectionByName(connection);
+		const stored = connection ? findConnectionByName(connection) : undefined;
 		if (!stored?.id) {
-			setErr(`No connection named '${connection}'.`);
+			setErr(
+				connection
+					? `No connection named '${connection}'.`
+					: "No connection selected. Press Tab to switch to Connections and pick one with Enter.",
+			);
 			setStatus("error");
 			return;
 		}

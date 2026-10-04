@@ -398,13 +398,20 @@ describe("TUI App", () => {
 		expect(lastFrame()).toContain("Type · Enter submit · Backspace delete");
 	});
 
-	it("renders the Question empty state when there are no connections", () => {
+	it("Question screen stays usable (slash commands) when there are no connections", async () => {
 		// Wipe the connection store for this one test.
 		if (tmpDir) {
 			const fs = require("node:fs");
 			fs.unlinkSync(join(tmpDir, "connections.json"));
 		}
-		const { lastFrame } = render(<App />);
+		const { lastFrame, stdin } = render(<App />);
+		// The input must render so the user can still reach slash commands.
+		expect(lastFrame()).toContain("type a question");
+		// Submitting a plain question surfaces the error inline.
+		stdin.write("how many orders?");
+		await new Promise((r) => setTimeout(r, 50));
+		stdin.write("\r");
+		await new Promise((r) => setTimeout(r, 50));
 		expect(lastFrame()).toContain("No connection selected");
 	});
 

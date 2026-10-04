@@ -177,7 +177,7 @@ export function App({ initialConnection }: AppProps) {
 					<ConnectionsScreen active={active} onSelect={setActive} />
 				)}
 				{screen === "history" && <HistoryScreen />}
-				{screen === "question" && active && (
+				{screen === "question" && (
 					<QuestionScreen
 						connection={active}
 						onBusyChange={setQuestionBusy}
@@ -187,20 +187,6 @@ export function App({ initialConnection }: AppProps) {
 						onLogout={handleLogout}
 						onLoggedIn={(u) => setUser({ email: u.email, plan: u.plan })}
 					/>
-				)}
-				{screen === "question" && !active && (
-					<Box flexDirection="column">
-						<Text bold color="yellow">
-							No connection selected
-						</Text>
-						<Text> </Text>
-						<Text>
-							Press <Text color="cyan">[Tab]</Text> to switch to Connections
-							and pick one with <Text color="cyan">Enter</Text>.
-						</Text>
-						<Text> </Text>
-						<Text dimColor>Or run `easysql demo` outside the TUI to generate one.</Text>
-					</Box>
 				)}
 			</Box>
 			<Footer screen={screen} />

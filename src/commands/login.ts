@@ -15,7 +15,7 @@ import type { Command } from "commander";
 import { ApiError } from "../cli/errors.js";
 import { saveConfig } from "../config/store.js";
 import { t } from "../i18n/messages.js";
-import { printError, printSuccess } from "../output/print.js";
+import { printError, printInfo, printSuccess } from "../output/print.js";
 import { getAuthenticatedClient, resolveApiUrl, type UserMe } from "../sdk/client.js";
 import { promptSecret } from "../util/prompt.js";
 
@@ -55,6 +55,7 @@ export function registerLogin(program: Command): void {
 		.option("--api-url <url>", "Override the API base URL for this login")
 		.option("-y, --non-interactive", "Disable prompts; fail when required values are missing")
 		.action(async (options: LoginOptions, cmd: Command) => {
+			printInfo(t().info.apiKeyGenerationHint);
 			const apiKey = await resolveApiKey(options);
 			const parentOpts = (cmd.parent?.opts() ?? {}) as { apiUrl?: string };
 			const apiUrl = resolveApiUrl(options.apiUrl ?? parentOpts.apiUrl);

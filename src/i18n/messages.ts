@@ -65,8 +65,7 @@ export const MESSAGES = {
 				`Already on the latest version (current: ${current}, latest: ${latest}).`,
 		},
 		info: {
-			apiKeyGenerationHint:
-				"Generate one for free at https://dashboard.easysql.net/api-keys",
+			apiKeyGenerationHint: "Generate one for free at https://dashboard.easysql.net/api-keys",
 			fetchingLatest: "Fetching latest release…",
 			generatingSql: "Generating SQL via EasySQL…",
 			executingSql: "Executing SQL locally…",

@@ -1,5 +1,63 @@
 import { describe, expect, it } from "bun:test";
-import { compareSemver, currentPlatform } from "../src/update/self-update.js";
+import {
+	compareSemver,
+	currentPlatform,
+	resolveUpdateTarget,
+	updateTempPath,
+} from "../src/update/self-update.js";
+
+describe("resolveUpdateTarget", () => {
+	it("uses the runtime path for check-only runs with an entry script", () => {
+		expect(
+			resolveUpdateTarget(
+				"/home/user/.nvm/versions/node/v24/bin/node",
+				"/home/user/.nvm/versions/node/v24/lib/node_modules/@easysql/cli/dist/bin.js",
+				true,
+			),
+		).toBe("/home/user/.nvm/versions/node/v24/bin/node");
+	});
+
+	it("does not use the runtime path when no entry script is available", () => {
+		expect(
+			resolveUpdateTarget("/home/user/.nvm/versions/node/v24/bin/node", undefined, true),
+		).toBeNull();
+	});
+
+	it("returns no target for Node/npm executions", () => {
+		expect(
+			resolveUpdateTarget(
+				"/home/user/.nvm/versions/node/v24/bin/node",
+				"/home/user/.nvm/versions/node/v24/lib/node_modules/@easysql/cli/dist/bin.js",
+			),
+		).toBeNull();
+		expect(
+			resolveUpdateTarget(
+				"/home/user/.nvm/versions/node/v24/bin/node",
+				"/home/user/.nvm/versions/node/v24/lib/node_modules/@easysql/cli/node_modules/.bin/easysql",
+			),
+		).toBeNull();
+	});
+
+	it("uses the executable path for a Bun-compiled standalone binary", () => {
+		expect(resolveUpdateTarget("/usr/local/bin/easysql", "/$bunfs/root/src/bin.js")).toBe(
+			"/usr/local/bin/easysql",
+		);
+		expect(
+			resolveUpdateTarget(
+				"C:\\Program Files\\EasySQL\\easysql.exe",
+				"C:\\$bunfs\\root\\src\\bin.js",
+			),
+		).toBe("C:\\Program Files\\EasySQL\\easysql.exe");
+	});
+});
+
+describe("updateTempPath", () => {
+	it("creates the temporary download beside the target executable", () => {
+		expect(updateTempPath("/usr/local/bin/easysql")).toBe(
+			"/usr/local/bin/easysql.easysql-update.tmp",
+		);
+	});
+});
 
 describe("compareSemver", () => {
 	it("treats equal versions as 0", () => {

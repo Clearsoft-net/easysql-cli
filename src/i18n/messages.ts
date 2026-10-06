@@ -8,6 +8,8 @@ export const MESSAGES = {
 		errors: {
 			notLoggedIn: "Not authenticated. Run 'easysql login' first.",
 			apiKeyRequired: "An API key is required. Generate one in the EasySQL dashboard.",
+			managedRuntimeUpdate:
+				"Self-update is for standalone binaries. For global installs, run `npm install -g @easysql/cli@latest` or `bun add -g @easysql/cli@latest`; for npx/bunx, run `npx @easysql/cli@latest` or `bunx @easysql/cli@latest`.",
 			invalidApiKey: "The API key is invalid or has been revoked.",
 			networkError: (msg: string) => `Network error: ${msg}`,
 			apiError: (status: number, msg: string) => `API error (${status}): ${msg}`,
@@ -26,7 +28,7 @@ export const MESSAGES = {
 				`${n} connections available. Use --connection <id> to pick one.`,
 			queryRejected: (sql: string, reason: string) =>
 				`Generated SQL was rejected by the local safety check (${reason}). SQL:\n${sql}`,
-			updateNoBinary: "Could not determine the path of the running binary.",
+			updateNoBinary: "Could not determine the path of the running standalone binary.",
 			updateUnsupportedPlatform: (platform: string) =>
 				`No release asset matches your platform (${platform}).`,
 			updateAlreadyLatest: (current: string, latest: string) =>

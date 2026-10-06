@@ -170,7 +170,8 @@ Override via `--config <path>` (acts on `getConfigPath()`). Directory: `$XDG_CON
 - Feed: `https://api.github.com/repos/Clearsoft-net/easysql-cli/releases/latest`
 - Asset naming: `easysql-<platform>-<arch>` (linux/darwin x x64/arm64 + windows-x64)
 - `currentPlatform()` resolves from `node:os` (arch = `arm64` or `x64`)
-- `atomicReplace()` uses `renameSync` (POSIX atomic on the same FS) — `bin/<exe>.easysql-update.tmp` is written first
+- Updates are supported only for Bun-compiled standalone binaries; Node/npm and interpreted Bun invocations print package-manager guidance. `--target` can explicitly select a standalone binary.
+- `updateTempPath()` places the downloaded temporary binary beside its target (`<target>.easysql-update.tmp`); `atomicReplace()` uses `renameSync` (POSIX atomic on the same FS).
 - The current version comes from `package.json` (via `src/version.ts`), with an import `with { type: "json" }`
 
 ## Build & release pipeline

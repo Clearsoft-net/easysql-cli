@@ -1,7 +1,7 @@
 /**
  * Self-update — queries the GitHub Releases API for the latest easysql-cli
  * release, downloads the matching platform binary, and atomically replaces
- * the running executable.
+ * the running standalone executable.
  *
  * Feed: https://api.github.com/repos/Clearsoft-net/easysql-cli/releases/latest
  * Asset naming convention: easysql-<platform>-<arch>
@@ -10,7 +10,6 @@
 
 import { chmodSync, existsSync, renameSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
-import { join } from "node:path";
 import { CliError } from "../cli/errors.js";
 import { NAME, REPO, VERSION } from "../version.js";
 
@@ -31,6 +30,21 @@ interface AssetMeta {
 interface GhRelease {
 	tag_name: string;
 	assets: AssetMeta[];
+}
+
+export function resolveUpdateTarget(
+	execPath: string,
+	entryScript: string | undefined,
+	checkOnly = false,
+): string | null {
+	const normalizedEntry = entryScript?.replaceAll("\\", "/");
+	if (normalizedEntry?.includes("/$bunfs/root/")) return execPath || null;
+	if (checkOnly && normalizedEntry) return execPath || null;
+	return null;
+}
+
+export function updateTempPath(target: string): string {
+	return `${target}.easysql-update.tmp`;
 }
 
 export function currentPlatform(): string {
@@ -134,7 +148,7 @@ export async function selfUpdate(opts: {
 		return { current, latest, updated: false };
 	}
 	const asset = findAsset(release, currentPlatform());
-	const tmp = join(opts.target, ".easysql-update.tmp");
+	const tmp = updateTempPath(opts.target);
 	await downloadAsset(asset.url, tmp);
 	atomicReplace(tmp, opts.target);
 	return { current, latest, updated: true };

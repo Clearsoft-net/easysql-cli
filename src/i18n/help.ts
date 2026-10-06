@@ -242,12 +242,13 @@ export const HELP_UPDATE = `
 Usage: easysql update [options]
 
 Fetch the latest release from GitHub and (optionally) replace the
-currently-installed binary.
+currently-running standalone binary. npm/Bun package installs should be
+updated with their package manager.
 
 Options:
   --check               Report current and latest version without installing
-  --target <path>       Override the path of the binary to replace
-                        (default: the path of the running executable)
+  --target <path>       Override the path of a standalone binary to replace
+                         (default: the running standalone binary)
 
 Examples:
   easysql update --check

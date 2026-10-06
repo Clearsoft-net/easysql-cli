@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.5.1]
+
+### Added
+
+- `easysql login` now prints a hint with the URL where an API key can be generated for free (`https://dashboard.easysql.net/api-keys`).
+
+### Fixed
+
+- The Question screen stays usable when no connection has been registered yet.
+
 ## [0.5.0]
 
 ### Changed
@@ -57,7 +67,8 @@ All notable changes to this project are documented here. The format is based on 
 - Standalone binaries for linux/darwin (x64, arm64) and windows-x64 via GitHub Releases.
 - Local SQL validator (defense in depth) and XDG-compliant storage with `0600` permissions.
 
-[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Clearsoft-net/easysql-cli/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Clearsoft-net/easysql-cli/releases/tag/v0.3.1

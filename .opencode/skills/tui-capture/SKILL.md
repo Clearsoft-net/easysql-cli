@@ -91,6 +91,41 @@ bun run scripts/tui-capture.ts --size 100x26 'quantos clientes temos?'
 bun run scripts/tui-capture.ts --wait 1500 --per-key 4000 'quantos clientes?' '$Enter'
 ```
 
+## Gravar um cast (asciinema)
+
+`scripts/tui-cast.ts` grava a sessão como um `.cast` real (asciicast v3),
+rodando o comando sob `asciinema rec` dentro do pane tmux e dirigindo as
+mesmas teclas do `tui-capture.ts`. Requer `asciinema` 3.x
+(`cargo install asciinema`, ou `--asciinema <path>`).
+
+```sh
+# pergunta completa na TUI (espera o spinner "Generating" sumir e encerra)
+bun run scripts/tui-cast.ts --out /tmp/q.cast 'quantos clientes temos?' '$Enter'
+
+# comando one-shot (encerra sozinho; --quit none)
+bun run scripts/tui-cast.ts --cmd 'bun run src/bin.ts query "quantos clientes?"' --quit none --out /tmp/q.cast
+
+# tocar / gerar GIF (agg é opcional)
+asciinema play /tmp/q.cast
+agg /tmp/q.cast /tmp/q.gif
+```
+
+| Opção | Default | Descrição |
+|---|---|---|
+| `--out <path>` | `/tmp/easysql-demo.cast` | arquivo `.cast` de saída |
+| `--settle <texto>` | `Generating` | espera esse texto sair da tela antes do `--quit` (captura o resultado); `''` desliga |
+| `--quit <tecla>` | `C-c` | tecla tmux que encerra a TUI; `none` para comandos que terminam sozinhos |
+| `--format v2\|v3` | `v3` | formato asciicast |
+| `--title <t>` | `EasySQL CLI` | título no metadata |
+| `--idle <s>` | `2` | `--idle-time-limit` (acelera pausas no playback) |
+| `--wait/--per-key/--hold/--timeout ms` | 1500/350/1500/15000 | temporizações |
+| `--cmd`, `--size`, `--session`, `--keep`, `--asciinema` | igual ao tui-capture | |
+
+Tokens iguais aos do `tui-capture.ts` (`$Tab`, `$Enter`, `$C-c`, texto literal).
+A TUI roda no alternate screen: converter para `.txt` sai vazio (o frame final
+é a tela primária restaurada), mas o `.cast` toca normalmente em `asciinema play`,
+asciinema.org e `agg`.
+
 ### Modo interativo (agente dirige a mesma sessão)
 
 ```sh

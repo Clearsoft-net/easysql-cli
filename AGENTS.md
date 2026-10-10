@@ -117,6 +117,7 @@ scripts/
 ├── package-linux.ts            # deb/rpm packaging of the Linux binary (dpkg-deb/rpmbuild)
 ├── release-binaries.ts         # builds linux/darwin/windows x x64/arm64 → bin/easysql-*
 ├── tui-capture.ts              # dev: renders the TUI in a PTY (tmux) + --png screenshot
+├── tui-cast.ts                 # dev: records the TUI/command as an asciinema .cast (async settle + quit)
 └── tsconfig.json               # extends ../tsconfig.json, outDir=../dist
 tests/                          # bun:test — one file per module + _helpers.ts + setup.ts (preload: silences console; EASYSQL_TEST_VERBOSE=1 to keep it)
 .github/workflows/

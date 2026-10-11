@@ -105,6 +105,9 @@ bun run scripts/tui-cast.ts --out /tmp/q.cast 'quantos clientes temos?' '$Enter'
 # comando one-shot (encerra sozinho; --quit none)
 bun run scripts/tui-cast.ts --cmd 'bun run src/bin.ts query "quantos clientes?"' --quit none --out /tmp/q.cast
 
+# ritmo enxuto: boot 0.3s, geração 1s, resultado 5s (pós-processa o .cast)
+bun run scripts/tui-cast.ts --trim --out /tmp/q.cast 'quantos clientes temos?' '$Enter'
+
 # tocar / gerar GIF (agg é opcional)
 asciinema play /tmp/q.cast
 agg /tmp/q.cast /tmp/q.gif
@@ -119,7 +122,15 @@ agg /tmp/q.cast /tmp/q.gif
 | `--title <t>` | `EasySQL CLI` | título no metadata |
 | `--idle <s>` | `2` | `--idle-time-limit` (acelera pausas no playback) |
 | `--wait/--per-key/--hold/--timeout ms` | 1500/350/1500/15000 | temporizações |
+| `--trim` | off | pós-processa o `.cast` (v3) comprimindo o tempo morto |
+| `--boot <s>` / `--gen <s>` / `--result <s>` | 0.3 / 1 / 5 | com `--trim`: tempo antes da pergunta, da fase "Generating" e do resultado na tela |
+| `--result-marker <texto>` | `row(s) in` | com `--trim`: marcador do frame de resultado |
+| `--question <texto>` | 1º token literal | com `--trim`: marcador da pergunta digitada |
 | `--cmd`, `--size`, `--session`, `--keep`, `--asciinema` | igual ao tui-capture | |
+
+`--trim` só atua em asciicast v3 (deltas por evento); em v2 vira no-op com aviso.
+O tempo real da API (~9s de "Generating") é comprimido para `--gen` s, o boot
+antes da pergunta para `--boot` s e o resultado fica `--result` s na tela.
 
 Tokens iguais aos do `tui-capture.ts` (`$Tab`, `$Enter`, `$C-c`, texto literal).
 A TUI roda no alternate screen: converter para `.txt` sai vazio (o frame final

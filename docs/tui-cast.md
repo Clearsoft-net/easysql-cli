@@ -116,10 +116,39 @@ bun run scripts/tui-cast.ts \
 | `--asciinema <path>` | auto | asciinema binary (otherwise `$ASCIINEMA`/`which`/`~/.cargo/bin`) |
 | `--session <name>` | `easysql-cast` | tmux session name |
 | `--keep` | off | don't kill the session (manual inspection) |
+| `--trim` | off | post-process the cast to compress dead time (see below) |
+| `--boot <s>` | `0.3` | with `--trim`: time before the question appears |
+| `--gen <s>` | `1` | with `--trim`: duration of the "Generating" phase |
+| `--result <s>` | `5` | with `--trim`: how long the result stays on screen |
+| `--result-marker <text>` | `row(s) in` | with `--trim`: text that marks the result frame |
+| `--question <text>` | first literal token | with `--trim`: text that marks the typed question |
 
 The positional **tokens** are sent in order; those starting with `$` are tmux
 keys (`$Tab`, `$BTab`, `$Enter`, `$Escape`, `$Up`, `$Down`, `$Left`, `$Right`,
 `$C-c`, `$BSpace`); any other value is sent as literal text.
+
+## Trimming the pacing
+
+Real API latency makes the raw cast drag (the "Generating SQL…" spinner can run
+for ~9 s). `--trim` rewrites the recorded v3 cast to hit a target pacing without
+re-recording:
+
+- **boot** — everything before the question is compressed into `--boot` seconds
+  (default `0.3`), so the video starts essentially at the question;
+- **typing** — a fixed `0.4 s` for the question + `Enter`;
+- **generating** — the spinner phase is squeezed to `--gen` seconds (default `1`);
+- **result** — the result frame holds for `--result` seconds (default `5`).
+
+```sh
+bun run scripts/tui-cast.ts --trim --out ./q.cast 'how many customers do we have?' '$Enter'
+# trim: boot=0.3s gen=1s result=5s -> total 6.70s
+```
+
+How it works: the helper finds the frame where the question text first appears,
+then the `--settle` marker (`Generating`) and the `--result-marker`
+(`row(s) in`), and remaps every event's relative timestamp through those four
+anchors (asciicast v3 stores per-event **deltas**). `--trim` only applies to
+asciicast v3; it is a no-op (with a warning) for v2.
 
 ## Converting to GIF (`agg`)
 

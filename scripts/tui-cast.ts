@@ -18,8 +18,11 @@
  * captures the result of the query. Use --settle '' to just wait --hold ms.
  *
  * `--trim` post-processes the recorded v3 cast to compress dead time: the boot
- * before the question becomes --boot secs, the "generating" phase --gen secs
- * (default 1) and the result screen holds for --result secs (default 5).
+ * before the question becomes --boot secs, the result screen holds for --result
+ * secs (default 5) and the "generating" phase is cut to --gen secs (default 1)
+ * by dropping spinner frames — the spinner keeps its natural frame rate, it is
+ * not sped up. `--replace <from> <to>` rewrites text in the cast (e.g. swap the
+ * account e-mail for a demo one); repeatable.
  *
  * Tokens starting with `$` are tmux key names (Tab, BTab, Enter, Escape,
  * Up, Down, Left, Right, C-c, ...). Anything else is sent as literal text.
@@ -52,6 +55,7 @@ interface Options {
 	resultSecs: number;
 	resultMarker: string;
 	question?: string;
+	replaces: Array<{ from: string; to: string }>;
 	asciinema?: string;
 	keep: boolean;
 	tokens: string[];
@@ -78,6 +82,7 @@ function parseArgs(argv: string[]): Options {
 		genSecs: 1,
 		resultSecs: 5,
 		resultMarker: "row(s) in",
+		replaces: [],
 		keep: false,
 		tokens: [],
 	};
@@ -144,6 +149,9 @@ function parseArgs(argv: string[]): Options {
 				break;
 			case "--question":
 				opts.question = argv[++i] as string;
+				break;
+			case "--replace":
+				opts.replaces.push({ from: argv[++i] as string, to: argv[++i] as string });
 				break;
 			case "--asciinema":
 				opts.asciinema = argv[++i] as string;
@@ -228,12 +236,6 @@ function trimCast(file: string, opts: Options): void {
 		return;
 	}
 	const events = raw.slice(1).map((l) => JSON.parse(l) as CastEvent);
-	const times: number[] = [];
-	let abs = 0;
-	for (const e of events) {
-		abs += e[0];
-		times.push(abs);
-	}
 
 	const question = opts.question ?? opts.tokens.find((t) => !t.startsWith("$"));
 	if (!question) {
@@ -258,42 +260,59 @@ function trimCast(file: string, opts: Options): void {
 		return;
 	}
 
-	const tQ = times[qi] as number;
-	const tG = times[gi] as number;
-	const tR = times[ri] as number;
-	const tEnd = times[times.length - 1] as number;
 	const typing = 0.4;
-	const anchors: Array<[number, number]> = [
-		[0, 0],
-		[tQ, opts.bootSecs],
-		[tG, opts.bootSecs + typing],
-		[tR, opts.bootSecs + typing + opts.genSecs],
-		[tEnd, opts.bootSecs + typing + opts.genSecs + opts.resultSecs],
-	];
-	const map = (t: number): number => {
-		if (t <= 0) return 0;
-		for (let i = 0; i < anchors.length - 1; i++) {
-			const [s0, d0] = anchors[i] as [number, number];
-			const [s1, d1] = anchors[i + 1] as [number, number];
-			if (t <= s1) return s1 <= s0 ? d1 : d0 + ((t - s0) / (s1 - s0)) * (d1 - d0);
+	const out: CastEvent[] = [];
+	const push = (e: CastEvent, delta: number): void => {
+		out.push([Number(Math.max(0, delta).toFixed(3)), e[1], e[2]]);
+	};
+	// Static segment (no visible animation): compress its total time to `dur`.
+	const scale = (from: number, to: number, dur: number): void => {
+		let orig = 0;
+		for (let i = from; i < to; i++) orig += (events[i] as CastEvent)[0];
+		const factor = orig > 0 ? dur / orig : 0;
+		for (let i = from; i < to; i++) {
+			const e = events[i] as CastEvent;
+			push(e, e[0] * factor);
 		}
-		return (anchors[anchors.length - 1] as [number, number])[1];
+	};
+	// Live segment (spinner): keep its natural frame rate, drop frames past `dur`.
+	let genKept = 0;
+	const keepNatural = (from: number, to: number, dur: number): void => {
+		let acc = 0;
+		for (let i = from; i < to; i++) {
+			if (acc >= dur) break;
+			const e = events[i] as CastEvent;
+			acc += e[0];
+			genKept++;
+			push(e, e[0]);
+		}
 	};
 
+	scale(0, qi, opts.bootSecs);
+	scale(qi, gi, typing);
+	keepNatural(gi, ri, opts.genSecs);
+	scale(ri, events.length, opts.resultSecs);
+
 	header.idle_time_limit = opts.resultSecs;
-	const out: string[] = [JSON.stringify(header)];
-	let prev = 0;
-	for (let i = 0; i < events.length; i++) {
-		const delta = Math.max(0, map(times[i] as number) - prev);
-		prev += delta;
-		const ev = (events[i] as CastEvent).slice() as unknown[];
-		ev[0] = Number(delta.toFixed(3));
-		out.push(JSON.stringify(ev));
+	const lines: string[] = [JSON.stringify(header)];
+	let total = 0;
+	for (const e of out) {
+		total += e[0];
+		lines.push(JSON.stringify(e));
 	}
-	writeFileSync(file, `${out.join("\n")}\n`);
+	writeFileSync(file, `${lines.join("\n")}\n`);
 	process.stdout.write(
-		`trim: boot=${opts.bootSecs}s gen=${opts.genSecs}s result=${opts.resultSecs}s -> total ${prev.toFixed(2)}s\n`,
+		`trim: boot=${opts.bootSecs}s gen=${opts.genSecs}s (spinner ${genKept}/${ri - gi} frames, natural) result=${opts.resultSecs}s -> total ${total.toFixed(2)}s\n`,
 	);
+}
+
+function postProcess(file: string, opts: Options): void {
+	if (opts.replaces.length > 0) {
+		let content = readFileSync(file, "utf8");
+		for (const { from, to } of opts.replaces) content = content.split(from).join(to);
+		writeFileSync(file, content);
+	}
+	if (opts.trim) trimCast(file, opts);
 }
 
 const opts = parseArgs(process.argv.slice(2));
@@ -359,7 +378,7 @@ try {
 			`cast not written: ${outPath}${finished ? "" : " (recording still running — raise --timeout or check --quit)"}`,
 		);
 	}
-	if (opts.trim) trimCast(outPath, opts);
+	if (opts.trim || opts.replaces.length > 0) postProcess(outPath, opts);
 	const bytes = statSync(outPath).size;
 	process.stdout.write(`${outPath}\n`);
 	process.stdout.write(`${opts.size}  ${bytes} bytes  finalizado=${finished}\n`);

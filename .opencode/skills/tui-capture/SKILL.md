@@ -126,11 +126,13 @@ agg /tmp/q.cast /tmp/q.gif
 | `--boot <s>` / `--gen <s>` / `--result <s>` | 0.3 / 1 / 5 | com `--trim`: tempo antes da pergunta, da fase "Generating" e do resultado na tela |
 | `--result-marker <texto>` | `row(s) in` | com `--trim`: marcador do frame de resultado |
 | `--question <texto>` | 1º token literal | com `--trim`: marcador da pergunta digitada |
+| `--replace <de> <para>` | — | troca texto no `.cast` (repetível), ex.: e-mail real → e-mail de demo |
 | `--cmd`, `--size`, `--session`, `--keep`, `--asciinema` | igual ao tui-capture | |
 
 `--trim` só atua em asciicast v3 (deltas por evento); em v2 vira no-op com aviso.
-O tempo real da API (~9s de "Generating") é comprimido para `--gen` s, o boot
-antes da pergunta para `--boot` s e o resultado fica `--result` s na tela.
+O boot antes da pergunta vira `--boot` s, o resultado fica `--result` s na tela e
+a fase "Generating" cai para `--gen` s **descartando frames** — o spinner mantém
+a velocidade natural (escalar os tempos o deixaria rápido/quebrado).
 
 Tokens iguais aos do `tui-capture.ts` (`$Tab`, `$Enter`, `$C-c`, texto literal).
 A TUI roda no alternate screen: converter para `.txt` sai vazio (o frame final

@@ -17,12 +17,16 @@
  * "Generating") to leave the screen before sending `--quit`, so the recording
  * captures the result of the query. Use --settle '' to just wait --hold ms.
  *
+ * `--trim` post-processes the recorded v3 cast to compress dead time: the boot
+ * before the question becomes --boot secs, the "generating" phase --gen secs
+ * (default 1) and the result screen holds for --result secs (default 5).
+ *
  * Tokens starting with `$` are tmux key names (Tab, BTab, Enter, Escape,
  * Up, Down, Left, Right, C-c, ...). Anything else is sent as literal text.
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const ROOT = dirname(import.meta.dir);
@@ -42,6 +46,12 @@ interface Options {
 	quit: string;
 	settle: string;
 	captureInput: boolean;
+	trim: boolean;
+	bootSecs: number;
+	genSecs: number;
+	resultSecs: number;
+	resultMarker: string;
+	question?: string;
 	asciinema?: string;
 	keep: boolean;
 	tokens: string[];
@@ -63,6 +73,11 @@ function parseArgs(argv: string[]): Options {
 		quit: "C-c",
 		settle: "Generating",
 		captureInput: false,
+		trim: false,
+		bootSecs: 0.3,
+		genSecs: 1,
+		resultSecs: 5,
+		resultMarker: "row(s) in",
 		keep: false,
 		tokens: [],
 	};
@@ -111,6 +126,24 @@ function parseArgs(argv: string[]): Options {
 				break;
 			case "--capture-input":
 				opts.captureInput = true;
+				break;
+			case "--trim":
+				opts.trim = true;
+				break;
+			case "--boot":
+				opts.bootSecs = Number(argv[++i]);
+				break;
+			case "--gen":
+				opts.genSecs = Number(argv[++i]);
+				break;
+			case "--result":
+				opts.resultSecs = Number(argv[++i]);
+				break;
+			case "--result-marker":
+				opts.resultMarker = argv[++i] as string;
+				break;
+			case "--question":
+				opts.question = argv[++i] as string;
 				break;
 			case "--asciinema":
 				opts.asciinema = argv[++i] as string;
@@ -183,6 +216,86 @@ function buildAsciinemaArgs(opts: Options, bin: string): string[] {
 	return args;
 }
 
+type CastEvent = [number, string, string];
+
+function trimCast(file: string, opts: Options): void {
+	const raw = readFileSync(file, "utf8")
+		.split("\n")
+		.filter((l) => l.trim() !== "");
+	const header = JSON.parse(raw[0] as string) as Record<string, unknown>;
+	if (header.version !== 3) {
+		process.stderr.write("trim: only asciicast v3 is supported; skipping\n");
+		return;
+	}
+	const events = raw.slice(1).map((l) => JSON.parse(l) as CastEvent);
+	const times: number[] = [];
+	let abs = 0;
+	for (const e of events) {
+		abs += e[0];
+		times.push(abs);
+	}
+
+	const question = opts.question ?? opts.tokens.find((t) => !t.startsWith("$"));
+	if (!question) {
+		process.stderr.write("trim: no question marker (pass --question); skipping\n");
+		return;
+	}
+	const genMarker = opts.settle || "Generating";
+	const findAt = (marker: string, from = 0): number => {
+		for (let i = from; i < events.length; i++) {
+			if ((events[i] as CastEvent)[2].includes(marker)) return i;
+		}
+		return -1;
+	};
+
+	const qi = findAt(question);
+	const gi = qi >= 0 ? findAt(genMarker, qi) : -1;
+	const ri = gi >= 0 ? findAt(opts.resultMarker, gi) : -1;
+	if (qi < 0 || gi < 0 || ri < 0) {
+		process.stderr.write(
+			`trim: markers not found (question=${qi} gen=${gi} result=${ri}); skipping\n`,
+		);
+		return;
+	}
+
+	const tQ = times[qi] as number;
+	const tG = times[gi] as number;
+	const tR = times[ri] as number;
+	const tEnd = times[times.length - 1] as number;
+	const typing = 0.4;
+	const anchors: Array<[number, number]> = [
+		[0, 0],
+		[tQ, opts.bootSecs],
+		[tG, opts.bootSecs + typing],
+		[tR, opts.bootSecs + typing + opts.genSecs],
+		[tEnd, opts.bootSecs + typing + opts.genSecs + opts.resultSecs],
+	];
+	const map = (t: number): number => {
+		if (t <= 0) return 0;
+		for (let i = 0; i < anchors.length - 1; i++) {
+			const [s0, d0] = anchors[i] as [number, number];
+			const [s1, d1] = anchors[i + 1] as [number, number];
+			if (t <= s1) return s1 <= s0 ? d1 : d0 + ((t - s0) / (s1 - s0)) * (d1 - d0);
+		}
+		return (anchors[anchors.length - 1] as [number, number])[1];
+	};
+
+	header.idle_time_limit = opts.resultSecs;
+	const out: string[] = [JSON.stringify(header)];
+	let prev = 0;
+	for (let i = 0; i < events.length; i++) {
+		const delta = Math.max(0, map(times[i] as number) - prev);
+		prev += delta;
+		const ev = (events[i] as CastEvent).slice() as unknown[];
+		ev[0] = Number(delta.toFixed(3));
+		out.push(JSON.stringify(ev));
+	}
+	writeFileSync(file, `${out.join("\n")}\n`);
+	process.stdout.write(
+		`trim: boot=${opts.bootSecs}s gen=${opts.genSecs}s result=${opts.resultSecs}s -> total ${prev.toFixed(2)}s\n`,
+	);
+}
+
 const opts = parseArgs(process.argv.slice(2));
 const [width, height] = opts.size.split("x");
 const asciinema = resolveAsciinema(opts.asciinema);
@@ -246,6 +359,7 @@ try {
 			`cast not written: ${outPath}${finished ? "" : " (recording still running — raise --timeout or check --quit)"}`,
 		);
 	}
+	if (opts.trim) trimCast(outPath, opts);
 	const bytes = statSync(outPath).size;
 	process.stdout.write(`${outPath}\n`);
 	process.stdout.write(`${opts.size}  ${bytes} bytes  finalizado=${finished}\n`);

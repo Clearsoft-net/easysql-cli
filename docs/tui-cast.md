@@ -116,10 +116,54 @@ bun run scripts/tui-cast.ts \
 | `--asciinema <path>` | auto | asciinema binary (otherwise `$ASCIINEMA`/`which`/`~/.cargo/bin`) |
 | `--session <name>` | `easysql-cast` | tmux session name |
 | `--keep` | off | don't kill the session (manual inspection) |
+| `--trim` | off | post-process the cast to compress dead time (see below) |
+| `--boot <s>` | `0.3` | with `--trim`: time before the question appears |
+| `--gen <s>` | `1` | with `--trim`: duration of the "Generating" phase |
+| `--result <s>` | `5` | with `--trim`: how long the result stays on screen |
+| `--result-marker <text>` | `row(s) in` | with `--trim`: text that marks the result frame |
+| `--question <text>` | first literal token | with `--trim`: text that marks the typed question |
+| `--replace <from> <to>` | — | rewrite text in the cast (repeatable), e.g. swap the account e-mail for a demo one |
 
 The positional **tokens** are sent in order; those starting with `$` are tmux
 keys (`$Tab`, `$BTab`, `$Enter`, `$Escape`, `$Up`, `$Down`, `$Left`, `$Right`,
 `$C-c`, `$BSpace`); any other value is sent as literal text.
+
+## Trimming the pacing
+
+Real API latency makes the raw cast drag (the "Generating SQL…" spinner can run
+for ~9 s). `--trim` rewrites the recorded v3 cast to hit a target pacing without
+re-recording:
+
+- **boot** — everything before the question is compressed into `--boot` seconds
+  (default `0.3`), so the video starts essentially at the question;
+- **typing** — a fixed `0.4 s` for the question + `Enter`;
+- **generating** — the spinner keeps its **natural frame rate**; extra frames are
+  dropped so the phase lasts `--gen` seconds (default `1`). It is not sped up —
+  scaling the timestamps would make the spinner spin too fast and look broken;
+- **result** — the result frame holds for `--result` seconds (default `5`).
+
+```sh
+bun run scripts/tui-cast.ts --trim --out ./q.cast 'how many customers do we have?' '$Enter'
+# trim: boot=0.3s gen=1s (spinner 12/170 frames, natural) result=5s -> total 6.78s
+```
+
+How it works: the helper finds the frame where the question text first appears,
+then the `--settle` marker (`Generating`) and the `--result-marker`
+(`row(s) in`), and splits the events into four segments. Static segments
+(boot/typing/result) are time-scaled; the spinner segment keeps its per-event
+deltas and is truncated to `--gen`. `--trim` only applies to asciicast v3; it is
+a no-op (with a warning) for v2.
+
+## Redacting text for a demo
+
+`--replace <from> <to>` does a literal substitution over the cast (repeatable),
+handy to swap the real account e-mail for a demo one before sharing:
+
+```sh
+bun run scripts/tui-cast.ts --trim \
+  --replace 'me@example.com' 'demo@easysql.net' \
+  --out ./q.cast 'how many customers do we have?' '$Enter'
+```
 
 ## Converting to GIF (`agg`)
 
